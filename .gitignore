@@ -1,0 +1,10 @@
+venv/
+.env
+agents/transcripts
+credentials.json
+token.json
+browser_profile/
+unverified_transcripts/
+verified_transcripts/
+playwright_profile/
+agents/__pycache__
