@@ -8,3 +8,4 @@ unverified_transcripts/
 verified_transcripts/
 playwright_profile/
 agents/__pycache__
+website/node_modules
