@@ -12,3 +12,5 @@ website/node_modules
 platform/backend/node_modules
 platform/frontend/node_modules
 platform/frontend/.angular
+platform/backend/.env
+platform/backend/.env.example
