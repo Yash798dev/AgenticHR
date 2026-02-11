@@ -1,13 +1,3 @@
-"""
-Interview Agent for Google Meet
-- Checks schedule every 1 minute
-- Joins 5 minutes before scheduled time
-- Waits until meeting start time before starting interview
-- Uses Google Meet Live Captions for candidate response transcription (NO audio capture)
-- Uses Groq API directly (no openai library)
-- Stores transcripts in transcripts folder
-"""
-
 import os
 import time
 import requests
@@ -65,9 +55,9 @@ class CaptionsListener:
     """Reads candidate responses from Google Meet live captions (DOM-based)."""
     
     def __init__(self):
-        self.silence_threshold = 10.0  # Seconds of no new captions = end of response
+        self.silence_threshold = 3.0 
         self.last_caption_text = ""
-        self.agent_speaking = False  # Flag to ignore agent's own speech
+        self.agent_speaking = False  
         
         print("[CONFIG] Using Google Meet Live Captions for transcription")
     
@@ -75,7 +65,6 @@ class CaptionsListener:
         """Enable live captions in Google Meet using Ctrl+C shortcut."""
         print("[CAPTIONS] Enabling live captions...")
         try:
-            # Google Meet shortcut to toggle captions
             page.keyboard.press("c")
             time.sleep(1)
             print("[OK] Captions enabled")
@@ -86,17 +75,11 @@ class CaptionsListener:
     
     def get_latest_caption(self, page):
         """Extract the latest caption text from Google Meet DOM."""
-        # Google Meet caption selectors (multiple fallbacks)
         selectors = [
-            # Primary: Caption container with speaker name
             '[jsname="tgaKEf"] span',
-            # Fallback: Direct caption text
             '.a4cQT',
-            # Alternative: Caption div
             '[data-message-text]',
-            # Generic caption container
             '.iOzk7',
-            # Another common selector
             '[jscontroller="LQRnv"] span'
         ]
         
@@ -104,9 +87,8 @@ class CaptionsListener:
             try:
                 elements = page.query_selector_all(selector)
                 if elements:
-                    # Get text from the last (most recent) caption element
                     texts = []
-                    for el in elements[-5:]:  # Last 5 elements to capture full response
+                    for el in elements[-5:]:  
                         text = el.inner_text().strip()
                         if text:
                             texts.append(text)
@@ -119,37 +101,26 @@ class CaptionsListener:
         return ""
     def extract_last_response(self, caption_text):
         """Extract only the LAST candidate response from accumulated captions."""
-        # Split by speaker names - look for candidate's name patterns
-        # The last block after a candidate name is their latest response
         lines = caption_text.split('\n')
-        
-        # Find the last occurrence of a candidate speaking (after "You" block ends)
         last_response_lines = []
         in_candidate_block = False
         
         for i, line in enumerate(lines):
             stripped = line.strip()
-            
-            # Skip noise
             if stripped in {'language', 'English', 'format_size', 'Font size', 
                            'circle', 'Font color', 'settings', 'Open caption settings', 'You'}:
-                if stripped == 'You':  # Agent's caption block starts
+                if stripped == 'You':  
                     in_candidate_block = False
-                    last_response_lines = []  # Reset, we want text AFTER this
+                    last_response_lines = []  
                 continue
-            
-            # Check if this looks like a speaker name (2 capitalized words)
             words = stripped.split()
             if len(words) == 2 and all(w[0].isupper() for w in words if w):
-                # This is likely the candidate's name - start capturing their response
                 in_candidate_block = True
-                last_response_lines = []  # Reset to capture only after name
+                last_response_lines = []  
                 continue
             
             if in_candidate_block and stripped:
                 last_response_lines.append(stripped)
-        
-        # Return only the last response
         return ' '.join(last_response_lines).strip()
     
     def listen(self, page, timeout=120):
@@ -166,23 +137,16 @@ class CaptionsListener:
         speech_detected = False
         
         while True:
-            # Check timeout
             elapsed = time.time() - start_time
             if elapsed > timeout:
                 print(f"\n[TIMEOUT] No response detected after {timeout}s")
                 return ""
-            
-            # Skip if agent is speaking
             if self.agent_speaking:
                 time.sleep(0.2)
                 continue
-            
-            # Get current caption
             current_caption = self.get_latest_caption(page)
             
-            # Check if caption changed
             if current_caption and current_caption != last_caption_full:
-                # Extract only the LAST candidate response
                 extracted = self.extract_last_response(current_caption)
                 
                 if extracted and extracted != last_extracted:
@@ -192,14 +156,11 @@ class CaptionsListener:
                     
                     last_extracted = extracted
                     last_change_time = time.time()
-                    
-                    # Show progress (truncated)
                     display = extracted[-60:] if len(extracted) > 60 else extracted
                     print(f"\r[CAPTION] ...{display}", end='', flush=True)
                 
                 last_caption_full = current_caption
             
-            # Check for silence
             if speech_detected and last_change_time:
                 silence_duration = time.time() - last_change_time
                 
@@ -223,11 +184,8 @@ class InterviewAgent:
         self.transcript_dir = os.path.join(os.getcwd(), "unverified_transcripts")
         os.makedirs(self.transcript_dir, exist_ok=True)
         
-        # Clients
         self.groq = GroqClient()
-        self.captions = CaptionsListener()  # Uses Google Meet captions instead of audio
-        
-        # Track processed meetings
+        self.captions = CaptionsListener()  
         self.processed_meetings = set()
         
         print("\n" + "="*60)
@@ -255,7 +213,6 @@ class InterviewAgent:
         for line in lines:
             stripped = line.strip()
             if stripped and stripped not in noise_words:
-                # Skip lines that are just names (2 words, both capitalized)
                 words = stripped.split()
                 if len(words) <= 2 and all(w[0].isupper() for w in words if w):
                     continue
@@ -266,11 +223,7 @@ class InterviewAgent:
     def speak(self, page, text):
         """Use browser TTS to speak. Enables mic, speaks, then disables mic."""
         print(f"[AGENT] {text}\n")
-        
-        # Set flag to ignore captions while agent speaks
         self.captions.set_agent_speaking(True)
-        
-        # Enable microphone before speaking
         print("[MIC] Enabling microphone...")
         page.keyboard.press("Control+d")
         time.sleep(0.5)
@@ -284,16 +237,13 @@ class InterviewAgent:
         """
         try:
             page.evaluate(script)
-            # Wait for speech (estimate)
             time.sleep(max(3, len(text.split()) * 0.4))
         except Exception as e:
             print(f"[ERROR] TTS error: {e}")
         finally:
-            # Disable microphone after speaking
             print("[MIC] Disabling microphone...")
             page.keyboard.press("Control+d")
             time.sleep(0.5)
-            # Clear flag so captions are read again
             self.captions.set_agent_speaking(False)
 
     def conduct_interview(self, page, candidate_name, role):
@@ -302,16 +252,9 @@ class InterviewAgent:
         print(f"[INTERVIEW] STARTING: {candidate_name}")
         print(f"[ROLE] {role}")
         print("="*60 + "\n")
-        
-        # Note: Mic and camera are already OFF from join_meeting
-        # Mic will be enabled/disabled in speak() method
-        
-        # Enable captions ONCE at the start - keep them on throughout
         print("[INFO] Enabling captions for the interview...")
         self.captions.enable_captions(page)
         time.sleep(1)
-        
-        # System prompt - natural conversation flow with conclusion guidance
         system_prompt = f"""You are an AI interviewer at Agentic HR conducting an interview with {candidate_name} for the {role} position.
 
 INTERVIEW GUIDELINES:
@@ -332,12 +275,10 @@ No markdown in responses."""
 
         conversation = [{"role": "system", "content": system_prompt}]
         
-        # Track interview timing
         interview_start = time.time()
-        max_duration_minutes = 40  # Maximum interview duration
+        max_duration_minutes = 40  
         max_duration_seconds = max_duration_minutes * 60
         
-        # Initial greeting
         greeting = self.groq.chat(conversation)
         if greeting:
             conversation.append({"role": "assistant", "content": greeting})
@@ -347,9 +288,8 @@ No markdown in responses."""
             self.speak(page, default_greeting)
             conversation.append({"role": "assistant", "content": default_greeting})
         
-        # Interview loop - continues until LLM concludes or time limit reached
         no_response_count = 0
-        max_no_response = 3  # End after 3 consecutive no-responses
+        max_no_response = 3 
         turn = 0
         
         while True:
@@ -359,12 +299,10 @@ No markdown in responses."""
             
             print(f"\n--- Turn {turn} | Elapsed: {int(elapsed/60)}min | Remaining: {int(remaining_mins)}min ---")
             
-            # Check time limit
             if elapsed >= max_duration_seconds:
                 print("\n[TIME] 40 minutes reached, concluding interview...")
                 break
             
-            # Listen for response via captions
             response = self.captions.listen(page, timeout=120)
             
             if not response:
@@ -375,14 +313,11 @@ No markdown in responses."""
                     print("[WARN] Too many no-responses, ending interview")
                     break
                 
-                # Try again with a prompt
                 self.speak(page, "I didn't catch that. Please take your time and respond when you're ready.")
                 continue
             
-            # Reset no-response counter on successful response
             no_response_count = 0
             
-            # Clean caption noise from response
             cleaned_response = self.clean_caption_text(response)
             if not cleaned_response:
                 print("[WARN] Response was all noise, asking to repeat")
@@ -392,13 +327,11 @@ No markdown in responses."""
             print(f"[CANDIDATE] {cleaned_response}\n")
             conversation.append({"role": "user", "content": cleaned_response})
             
-            # Generate reply - send only system + last 8 messages to avoid payload too large
             limited_conversation = [conversation[0]] + conversation[-8:] if len(conversation) > 9 else conversation
             reply = self.groq.chat(limited_conversation)
             if reply:
                 conversation.append({"role": "assistant", "content": reply})
                 
-                # Check if LLM wants to end the interview
                 if "[END_INTERVIEW]" in reply:
                     print("\n[LLM] Interview conclusion signaled")
                     clean_reply = reply.replace("[END_INTERVIEW]", "").strip()
@@ -410,13 +343,11 @@ No markdown in responses."""
                 print("[ERROR] Failed to generate reply")
                 break
         
-        # If loop ended without LLM conclusion, add closing
         if "[END_INTERVIEW]" not in str(conversation):
             closing = "Thank you so much for your time today. We've covered everything we needed. Our team will review your application and get back to you soon. Have a great day!"
             self.speak(page, closing)
             conversation.append({"role": "assistant", "content": closing})
         
-        # Save transcript
         self.save_transcript(candidate_name, conversation)
         print("\n[OK] Interview complete!\n")
 
@@ -426,7 +357,6 @@ No markdown in responses."""
         filename = f"{candidate_name.replace(' ', '_')}_{timestamp}.txt"
         filepath = os.path.join(self.transcript_dir, filename)
         
-        # Get email and role from stored values (set in join_meeting or conduct_interview)
         email = getattr(self, 'current_email', 'Not provided')
         role = getattr(self, 'current_role', 'Unknown')
         
@@ -464,10 +394,8 @@ No markdown in responses."""
                 scheduled_time_str = str(row.get('Scheduled Time', ''))
                 meeting_link = str(row.get('Meeting Link', ''))
                 
-                # Try to get email from this file first, then lookup in scheduled_interviews.xlsx
                 candidate_email = str(row.get('Email', ''))
                 if not candidate_email or candidate_email == 'nan':
-                    # Lookup email from scheduled_interviews.xlsx
                     try:
                         scheduled_df = pd.read_excel(os.path.join(os.getcwd(), "data", "scheduled_interviews.xlsx"))
                         match = scheduled_df[scheduled_df['Candidate Name'] == candidate_name]
@@ -478,12 +406,10 @@ No markdown in responses."""
                     except:
                         candidate_email = 'Not provided'
                 
-                # Create unique ID
                 meeting_id = f"{candidate_name}_{scheduled_time_str}"
                 if meeting_id in self.processed_meetings:
                     continue
                 
-                # Parse time (format: 25-01-2026 12:00 PM)
                 try:
                     scheduled_time = datetime.strptime(scheduled_time_str, "%d-%m-%Y %I:%M %p")
                 except:
@@ -493,7 +419,6 @@ No markdown in responses."""
                         print(f"[WARN] Could not parse time: {scheduled_time_str}")
                         continue
                 
-                # Calculate time difference
                 time_diff_minutes = (scheduled_time - now).total_seconds() / 60
                 
                 if 0 <= time_diff_minutes <= 5:
@@ -514,20 +439,17 @@ No markdown in responses."""
         """Join meeting, wait until 1 min after scheduled time, then conduct interview."""
         print(f"\n[JOIN] Joining meeting for {candidate_name} ({candidate_email})...")
         
-        # Store email for later use
         self.current_email = candidate_email
         self.current_role = role
         
         context = None
         p = None
         
-        # Persistent profile path - stores login cookies
         profile_dir = os.path.join(os.getcwd(), "browser_profile")
         
         try:
             p = sync_playwright().start()
             
-            # Use persistent context - this saves cookies/login between sessions
             print(f"[INFO] Using persistent profile: {profile_dir}")
             context = p.chromium.launch_persistent_context(
                 profile_dir,
@@ -540,15 +462,12 @@ No markdown in responses."""
                 accept_downloads=True
             )
             
-            # Get existing page or create new one
             page = context.pages[0] if context.pages else context.new_page()
             
-            # Navigate to meeting
             print(f"[NAV] Opening: {meeting_link}")
             page.goto(meeting_link)
             time.sleep(5)
             
-            # Check if we need to login (first time only)
             if "accounts.google.com" in page.url:
                 print("\n" + "="*60)
                 print("[LOGIN REQUIRED]")
@@ -556,7 +475,6 @@ No markdown in responses."""
                 print("Your login will be saved for future sessions.")
                 print("="*60 + "\n")
                 
-                # Wait for user to login (max 2 minutes)
                 for i in range(12):  # 12 x 5 = 60 seconds
                     time.sleep(5)
                     if "meet.google.com" in page.url:
@@ -567,13 +485,11 @@ No markdown in responses."""
                     print("[ERROR] Login timeout")
                     return
             
-            # Mute camera and mic initially
-            page.keyboard.press("Control+e")  # Camera off
+            page.keyboard.press("Control+e") 
             time.sleep(1)
-            page.keyboard.press("Control+d")  # Mic off
+            page.keyboard.press("Control+d") 
             time.sleep(1)
             
-            # Click join button
             try:
                 join_btn = page.locator("button:has-text('Join now'), button:has-text('Ask to join')").first
                 join_btn.click(timeout=10000)
@@ -584,7 +500,6 @@ No markdown in responses."""
             time.sleep(3)
             print("[OK] In meeting!")
             
-            # Calculate wait time: interview starts 2 minutes AFTER scheduled meeting time
             interview_start_time = scheduled_time + timedelta(minutes=1)
             now = datetime.now()
             wait_seconds = (interview_start_time - now).total_seconds()
@@ -609,10 +524,8 @@ No markdown in responses."""
             
             print("\n[START] Starting interview...")
             
-            # Conduct interview
             self.conduct_interview(page, candidate_name, role)
             
-            # Leave meeting
             print("[LEAVE] Leaving meeting...")
             page.keyboard.press("Control+h")
             time.sleep(2)
@@ -629,10 +542,7 @@ No markdown in responses."""
         """Main loop - checks schedule every 1 minute."""
         print("[RUN] Agent running. Press Ctrl+C to stop.\n")
         
-        # Check immediately
         self.check_schedule()
-        
-        # Schedule checks every 1 minute
         schedule.every(1).minutes.do(self.check_schedule)
         
         while True:

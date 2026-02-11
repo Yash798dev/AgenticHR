@@ -28,25 +28,21 @@ class OfferLetterAgent:
     """Generates and sends offer letters to selected candidates."""
     
     def __init__(self):
-        # Email config
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.sender_email = os.getenv("SENDER_EMAIL")
         self.sender_password = os.getenv("SENDER_PASSWORD")  # App password for Gmail
         
-        # Paths
         self.scores_file = os.path.join(os.getcwd(), "data", "interview_scores.xlsx")
         self.offers_dir = os.path.join(os.getcwd(), "offer_letters")
         self.sent_log = os.path.join(os.getcwd(), "data", "sent_offers.xlsx")
         
         os.makedirs(self.offers_dir, exist_ok=True)
         
-        # Company details
         self.company_name = "Agentic HR"
         self.company_email = "hr@agentichr.ai"
         self.company_website = "www.agentichr.ai"
         
-        # Acceptance deadline (days)
         self.acceptance_days = 7
         
         print("\n" + "="*60)
@@ -65,16 +61,13 @@ class OfferLetterAgent:
         
         df = pd.read_excel(self.scores_file)
         
-        # Filter by recommendation
         eligible = df[df['Recommendation'].isin(['Consider', 'Recommend', 'Strongly Recommend'])]
         
-        # Check if already sent
         sent_emails = set()
         if os.path.exists(self.sent_log):
             sent_df = pd.read_excel(self.sent_log)
             sent_emails = set(sent_df['Email'].tolist())
         
-        # Filter out already sent
         new_candidates = []
         for _, row in eligible.iterrows():
             email = row.get('Email', '')
@@ -90,12 +83,9 @@ class OfferLetterAgent:
         role = candidate.get('Role', 'Position')
         score = candidate.get('Total Score', 0)
         recommendation = candidate.get('Recommendation', '')
-        
-        # PDF filename
         filename = f"Offer_Letter_{name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
         filepath = os.path.join(self.offers_dir, filename)
         
-        # Create PDF
         doc = SimpleDocTemplate(filepath, pagesize=A4, 
                                rightMargin=0.75*inch, leftMargin=0.75*inch,
                                topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -103,7 +93,6 @@ class OfferLetterAgent:
         styles = getSampleStyleSheet()
         story = []
         
-        # Custom styles
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
@@ -153,7 +142,6 @@ class OfferLetterAgent:
             spaceAfter=15
         )
         
-        # Header with gradient-like effect using table
         header_data = [[
             Paragraph(f"<b>{self.company_name}</b>", ParagraphStyle('CompanyName', fontSize=24, textColor=colors.white, alignment=TA_CENTER))
         ]]

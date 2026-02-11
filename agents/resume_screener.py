@@ -27,7 +27,6 @@ class JobScreener:
         """Loads applicant data from Excel file."""
         try:
             df = pd.read_excel(self.data_path)
-            # Ensure resume_text exists, fill NaN with empty string
             if 'resume_text' not in df.columns:
                 print("Error: 'resume_text' column missing in data.")
                 return None
@@ -109,7 +108,6 @@ Return ONLY a JSON object with the following format (no markdown code blocks):
             )
             
             content = response.choices[0].message.content
-            # Cleanup code blocks if model adds them despite instructions
             if content.startswith("```json"):
                 content = content[7:]
             if content.endswith("```"):
@@ -163,5 +161,4 @@ if __name__ == "__main__":
     if screener.api_key:
         screener.process_applicants()
     else:
-        # Dry run or prompt user to add key
         print("Set GROQ_API_KEY in .env to run evaluations.")

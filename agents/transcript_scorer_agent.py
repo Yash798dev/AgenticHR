@@ -67,12 +67,10 @@ class TranscriptScorer:
     def __init__(self):
         self.groq = GroqClient()
         
-        # Paths
         self.unverified_dir = os.path.join(os.getcwd(), "unverified_transcripts")
         self.verified_dir = os.path.join(os.getcwd(), "verified_transcripts")
         self.results_file = os.path.join(os.getcwd(), "data", "interview_scores.xlsx")
         
-        # Create directories
         os.makedirs(self.unverified_dir, exist_ok=True)
         os.makedirs(self.verified_dir, exist_ok=True)
         os.makedirs(os.path.dirname(self.results_file), exist_ok=True)
@@ -87,11 +85,10 @@ class TranscriptScorer:
     
     def clean_caption_noise(self, text):
         """Remove Google Meet caption UI elements from transcript."""
-        # Lines to completely remove (exact matches)
         noise_lines = {
             'language', 'English', 'format_size', 'Font size', 
             'circle', 'Font color', 'settings', 'Open caption settings',
-            'Hindi', 'Spanish', 'French', 'German'  # Other languages
+            'Hindi', 'Spanish', 'French', 'German' 
         }
         
         lines = text.split('\n')
@@ -99,15 +96,11 @@ class TranscriptScorer:
         
         for line in lines:
             stripped = line.strip()
-            # Skip empty lines and noise lines
             if not stripped:
                 continue
             if stripped in noise_lines:
                 continue
-            # Skip lines that are just a person's name (speaker label in captions)
-            # These usually appear right before the actual text
             if len(stripped.split()) <= 2 and not stripped.startswith(('Agent:', 'Candidate:')):
-                # Check if it looks like a name (capitalized words)
                 words = stripped.split()
                 if all(w[0].isupper() if w else False for w in words):
                     continue
@@ -122,7 +115,6 @@ class TranscriptScorer:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Extract candidate info from header
             lines = content.split('\n')
             candidate_name = "Unknown"
             candidate_email = "Not provided"
@@ -136,9 +128,7 @@ class TranscriptScorer:
                 elif line.startswith("Role:"):
                     role = line.replace("Role:", "").strip()
                 elif line.startswith("="):
-                    break  # Header section ends
-            
-            # Clean the caption noise
+                    break  
             cleaned_content = self.clean_caption_noise(content)
             
             print(f"[CLEAN] Removed caption UI noise from transcript")
@@ -196,9 +186,7 @@ OUTPUT FORMAT (JSON only, no other text):
         
         if response:
             try:
-                # Extract JSON from response
                 import json
-                # Try to find JSON in response
                 start = response.find('{')
                 end = response.rfind('}') + 1
                 if start != -1 and end > start:
@@ -213,7 +201,6 @@ OUTPUT FORMAT (JSON only, no other text):
     def save_to_excel(self, score_data, filepath):
         """Save score to Excel file."""
         try:
-            # Load existing or create new
             if os.path.exists(self.results_file):
                 df = pd.read_excel(self.results_file)
             else:
@@ -223,7 +210,6 @@ OUTPUT FORMAT (JSON only, no other text):
                     'Recommendation', 'Summary', 'Transcript Path', 'Scored Date'
                 ])
             
-            # Add new row
             new_row = {
                 'Candidate Name': score_data.get('candidate_name', 'Unknown'),
                 'Email': score_data.get('email', 'Not provided'),
@@ -268,7 +254,6 @@ OUTPUT FORMAT (JSON only, no other text):
         print(f"[PROCESSING] {filename}")
         print('='*60)
         
-        # Step 1: Parse transcript
         print("[STEP 1] Reading transcript...")
         transcript_data = self.parse_transcript(filepath)
         if not transcript_data:
@@ -276,7 +261,6 @@ OUTPUT FORMAT (JSON only, no other text):
             return False
         print(f"[OK] Candidate: {transcript_data['name']}")
         
-        # Step 2: Score with LLM
         print("[STEP 2] Analyzing with LLM...")
         score_data = self.score_transcript(transcript_data)
         if not score_data:
@@ -291,12 +275,10 @@ OUTPUT FORMAT (JSON only, no other text):
         print(f"[OK] Recommendation: {score_data.get('recommendation', 'N/A')}")
         print(f"[OK] Email: {score_data['email']}")
         
-        # Step 3: Save to Excel
         print("[STEP 3] Saving to Excel...")
         if not self.save_to_excel(score_data, filepath):
             return False
         
-        # Step 4: Move to verified
         print("[STEP 4] Moving to verified folder...")
         new_path = self.move_to_verified(filepath)
         
@@ -316,10 +298,8 @@ OUTPUT FORMAT (JSON only, no other text):
         """Main loop - watches for new transcripts."""
         print("[RUN] Transcript Scorer running. Press Ctrl+C to stop.\n")
         
-        # Process existing files first
         self.process_existing_files()
         
-        # Setup file watcher
         event_handler = TranscriptHandler(self)
         observer = Observer()
         observer.schedule(event_handler, self.unverified_dir, recursive=False)
@@ -348,7 +328,6 @@ class TranscriptHandler(FileSystemEventHandler):
             return
         
         if event.src_path.endswith('.txt'):
-            # Wait a moment for file to be fully written
             time.sleep(1)
             print(f"\n[NEW FILE] {os.path.basename(event.src_path)}")
             self.scorer.process_transcript(event.src_path)

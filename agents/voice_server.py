@@ -8,12 +8,10 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import datetime
 
-# Load environment from project root
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 app = FastAPI()
 
-# Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
 MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
@@ -21,12 +19,9 @@ MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
 print(f"[CONFIG] GROQ_API_KEY: {'SET' if GROQ_API_KEY else 'NOT SET'}")
 print(f"[CONFIG] Model: {MODEL}")
 
-# Initialize OpenAI client
 CLIENT = None
 if GROQ_API_KEY:
     CLIENT = OpenAI(api_key=GROQ_API_KEY, base_url=GROQ_API_URL)
-
-# In-memory store for conversation history
 conversations = {}
 candidate_context = {}
 
@@ -35,17 +30,14 @@ candidate_context = {}
 async def voice_start(request: Request):
     """Initial entry point for the call."""
     try:
-        # Get form data from Twilio
         form_data = await request.form()
         CallSid = form_data.get("CallSid", "unknown")
         
-        # Get candidate info from query parameters (passed in webhook URL)
         query_params = request.query_params
         candidate_name = query_params.get("candidate_name", "Candidate")
         role = query_params.get("role", "the position")
         salary_range = query_params.get("salary_range", "competitive")
         
-        # URL decode the parameters
         from urllib.parse import unquote
         candidate_name = unquote(candidate_name)
         role = unquote(role)
@@ -54,14 +46,11 @@ async def voice_start(request: Request):
         print(f"[CALL START] CallSid: {CallSid}")
         print(f"[CALL START] Candidate: {candidate_name}, Role: {role}, Salary: {salary_range}")
         
-        # Initialize context
         candidate_context[CallSid] = {
             "name": candidate_name,
             "role": role,
             "salary_range": salary_range
         }
-        
-        # System Prompt
         system_prompt = f"""
 You are an expert HR Recruiter at Agentic HR. You are calling {candidate_name} who has been shortlisted for the {role} position.
 Your goals are:
@@ -100,7 +89,6 @@ Keep your responses concise (1-2 sentences) as this is a voice conversation. Spe
 async def process_speech(request: Request):
     """Handles the loop of receiving speech and responding."""
     try:
-        # Get form data from Twilio
         form_data = await request.form()
         CallSid = form_data.get("CallSid", "")
         SpeechResult = form_data.get("SpeechResult", "")
@@ -115,11 +103,9 @@ async def process_speech(request: Request):
             response.hangup()
             return Response(content=str(response), media_type="application/xml")
         
-        # Add user message
         if SpeechResult:
             conversations[CallSid].append({"role": "user", "content": SpeechResult})
         
-        # Get LLM Response
         ai_text = "I'm having trouble processing that. Could you repeat?"
         
         if CLIENT:
@@ -139,14 +125,11 @@ async def process_speech(request: Request):
         else:
             print("[ERROR] CLIENT not initialized - check GROQ_API_KEY")
         
-        # Save Transcript
         save_transcript(CallSid)
         
-        # Build TwiML Response
         response = VoiceResponse()
         response.say(ai_text, voice="alice")
         
-        # End conversation check
         if "goodbye" in ai_text.lower() or "have a great day" in ai_text.lower():
             response.hangup()
         else:
@@ -172,7 +155,6 @@ def save_transcript(call_sid):
     context = candidate_context.get(call_sid, {})
     name = context.get('name', 'Unknown')
     
-    # Target: AgenticHR/transcripts (for scheduler to find)
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     transcript_dir = os.path.join(root_dir, "agents", "transcripts")
     

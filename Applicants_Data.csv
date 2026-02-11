@@ -1,0 +1,80 @@
+candidate_id,full_name,mobile_number,email,current_location,resume_file_text,current_role,total_experience_years,skills,preferred_role,expected_salary,notice_period_days,education
+
+C001,Rahul Sharma,9876543210,rahul.ds@gmail.com,Bangalore,,Data Scientist,3,"Python,Machine Learning,NLP,TensorFlow",Data Scientist,8 LPA,30,B.Tech CSE
+
+C002,Anita Verma,9123456789,anita.frontend@gmail.com,Hyderabad,/resumes/anita_fe.pdf,Frontend Developer,2,"Angular,JavaScript,HTML,CSS",Frontend Developer,6 LPA,15,B.Tech IT
+
+C003,Kiran Reddy,9988776655,kiran.backend@gmail.com,Chennai,/resumes/kiran_backend.pdf,Backend Engineer,4,"Node.js,SQL,Docker,REST APIs",Backend Engineer,9 LPA,45,B.Tech CSE
+
+C004,Pooja Mehta,9876501234,pooja.ml@gmail.com,Pune,/resumes/pooja_ml.pdf,ML Engineer,3,"Python,ML,Deep Learning,PyTorch",Data Scientist,8.5 LPA,30,M.Tech AI
+
+C005,Suresh Naik,9001122334,suresh.qa@gmail.com,Bangalore,/resumes/suresh_qa.pdf,QA Engineer,5,"Manual Testing,Automation,Selenium,Java",QA Lead,7 LPA,60,B.Tech ECE
+
+C006,Neha Singh,9345678123,neha.hr@gmail.com,Delhi,/resumes/neha_hr.pdf,HR Executive,4,"Recruitment,Screening,HR Operations",HR Manager,6 LPA,30,MBA HR
+
+C007,Arjun Patel,9812345678,arjun.data@gmail.com,Ahmedabad,/resumes/arjun_analyst.pdf,Data Analyst,2,"SQL,Excel,Power BI,Python",Data Analyst,5.5 LPA,15,B.Sc Statistics
+
+C008,Kavya Nair,9090909090,kavya.ui@gmail.com,Kochi,/resumes/kavya_ui.pdf,UI/UX Designer,3,"Figma,Adobe XD,UX Research,Wireframing",UI/UX Designer,7 LPA,30,B.Des
+
+C009,Manoj Kumar,9966332211,manoj.devops@gmail.com,Bangalore,/resumes/manoj_devops.pdf,DevOps Engineer,5,"AWS,Docker,Kubernetes,CI/CD",DevOps Engineer,12 LPA,60,B.Tech CSE
+
+C010,Divya Iyer,9887766554,divya.ai@gmail.com,Coimbatore,/resumes/divya_ai.pdf,AI Engineer,2,"Python,NLP,Transformers,LLMs",AI Engineer,7.5 LPA,30,M.Sc AI
+
+C011,Rohit Agarwal,9011223344,rohit.java@gmail.com,Noida,/resumes/rohit_java.pdf,Java Developer,4,"Java,Spring Boot,Microservices,SQL",Backend Engineer,9 LPA,45,B.Tech IT
+
+C012,Swathi Raju,9445566778,swathi.cloud@gmail.com,Hyderabad,/resumes/swathi_cloud.pdf,Cloud Engineer,3,"AWS,Azure,Linux,Networking",Cloud Engineer,8 LPA,30,B.Tech ECE
+
+C013,Vikram Joshi,9334455667,vikram.product@gmail.com,Mumbai,/resumes/vikram_pm.pdf,Product Manager,6,"Product Strategy,Agile,Roadmaps",Product Manager,14 LPA,60,MBA Product
+
+C014,Aishwarya Rao,9556677889,aish.data@gmail.com,Mysore,/resumes/aish_ds.pdf,ML Engineer,1.5,"Python,ML,Data Preprocessing",Data Scientist,6 LPA,15,B.Tech AI
+
+C015,Nikhil Bansal,9778899001,nikhil.cyber@gmail.com,Gurgaon,/resumes/nikhil_security.pdf,Cybersecurity Analyst,4,"Network Security,SIEM,Pen Testing",Security Analyst,10 LPA,45,B.Tech CSE
+
+C016,Meghana Das,9223344556,meghana.content@gmail.com,Bangalore,/resumes/meghana_content.pdf,Content Writer,3,"Technical Writing,SEO,Documentation",Technical Writer,5 LPA,30,BA English
+
+C017,Ajay Malhotra,9898989898,ajay.fullstack@gmail.com,Chandigarh,/resumes/ajay_fullstack.pdf,Full Stack Developer,3.5,"Angular,Node.js,MongoDB,Express",Full Stack Developer,9 LPA,30,B.Tech IT
+
+C018,Sneha Kulkarni,9112233445,sneha.ds@gmail.com,Nagpur,/resumes/sneha_ds.pdf,Data Scientist,5,"Python,ML,NLP,Big Data",Senior Data Scientist,13 LPA,60,M.Tech Data Science
+
+C019,Praveen Kumar,9665544332,praveen.mobile@gmail.com,Bangalore,/resumes/praveen_android.pdf,Android Developer,4,"Kotlin,Java,Android SDK",Mobile App Developer,8.5 LPA,30,B.Tech CSE
+
+C020,Ritu Saxena,9888997766,ritu.support@gmail.com,Jaipur,/resumes/ritu_support.pdf,Customer Support Executive,2,"Customer Handling,CRM,Communication",Support Lead,4.5 LPA,15,B.Com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Suresh Naik QA Engineer | 5 Years Experience Location: Bangalore Summary:QA Engineer with expertise in automation testing.Skills:Manual Testing, Automation Testing, Selenium, Java Experience: QA Engineer – SoftTest Solutions (2019–Present) Education:B.Tech in Electronics and Communication Engineering
+
+
+
+
+
+
+

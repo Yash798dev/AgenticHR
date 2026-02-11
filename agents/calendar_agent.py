@@ -9,14 +9,13 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class RequestsHttp:
     """Adapter to make requests.Session look like httplib2.Http."""
     def __init__(self, timeout=60):
         self.session = requests.Session()
-        self.session.trust_env = False # Ignore system proxies, force direct connection
+        self.session.trust_env = False 
         self.timeout = timeout
 
     class Response(dict):
@@ -24,7 +23,7 @@ class RequestsHttp:
         def __init__(self, headers, status):
             super().__init__(headers)
             self.status = status
-            self.reason = "OK" # Placeholder
+            self.reason = "OK" 
 
     def request(self, uri, method="GET", body=None, headers=None, redirections=5, connection_type=None):
         if headers is None:
@@ -37,10 +36,7 @@ class RequestsHttp:
                 headers=headers, 
                 timeout=self.timeout
             )
-            
-            # Format headers to mimic httplib2
             resp_headers = dict(response.headers)
-            # Create object that has .status attribute AND is a dict of headers
             resp_obj = self.Response(resp_headers, response.status_code)
             
             return resp_obj, response.content
@@ -74,17 +70,11 @@ class CalendarAgent:
                 flow = InstalledAppFlow.from_client_secrets_file(self.creds_path, SCOPES)
                 self.creds = flow.run_local_server(port=8080)
             
-            # Save the credentials for the next run
             with open(self.token_path, 'w') as token:
                 token.write(self.creds.to_json())
 
         try:
-            # Use our custom RequestsHttp adapter instead of httplib2
             http = RequestsHttp(timeout=120)
-            # We still need Google's auth logic to sign the requests
-            # google_auth_httplib2.AuthorizedHttp wraps an 'http' object and adds headers.
-            # It expects the wrapped object to have a .request() method returning (headers, content).
-            # Our RequestsHttp does exactly that.
             authorized_http = google_auth_httplib2.AuthorizedHttp(self.creds, http=http)
             
             self.service = build('calendar', 'v3', http=authorized_http)
@@ -96,7 +86,6 @@ class CalendarAgent:
     def parse_datetime(self, date_str):
         """Parses DD-MM-YYYY HH:MM AM/PM string to datetime object."""
         try:
-            # Example: 26-01-2026 10:00 AM
             return datetime.datetime.strptime(date_str, "%d-%m-%Y %I:%M %p")
         except ValueError:
             print(f"Error parsing date format: {date_str}. Expected 'DD-MM-YYYY HH:MM AM/PM'")
@@ -120,7 +109,7 @@ class CalendarAgent:
             'description': f'Technical Interview for {role} at Agentic HR.',
             'start': {
                 'dateTime': start_time.isoformat(),
-                'timeZone': 'Asia/Kolkata',  # Adjust as needed or make configurable
+                'timeZone': 'Asia/Kolkata', 
             },
             'end': {
                 'dateTime': end_time.isoformat(),

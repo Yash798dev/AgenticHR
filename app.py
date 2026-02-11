@@ -1,10 +1,3 @@
-"""
-Agentic HR - LangGraph Orchestrator (Step-by-Step Mode)
-=======================================================
-Uses LangGraph for workflow orchestration with human-in-the-loop.
-Each step waits for completion before allowing the next to run.
-"""
-
 import os
 import sys
 import operator
@@ -13,26 +6,15 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 
-# LangGraph imports
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-# Project root - fixed absolute path
 PROJECT_ROOT = r"C:\Users\yashw\Desktop\AgenticHR"
 
-# Add agents directory to path
-sys.path.insert(0, os.path.join(PROJECT_ROOT, "agents"))
-
-# Change working directory to project root
-os.chdir(PROJECT_ROOT)
 
 load_dotenv()
 
-
-# ============================================================================
-# AGENT FUNCTIONS (Standalone - not LangGraph nodes)
-# ============================================================================
 
 def run_resume_screener(job_id, role, min_experience, location, salary_range):
     """Run the resume screener and return results."""
@@ -40,11 +22,11 @@ def run_resume_screener(job_id, role, min_experience, location, salary_range):
     
     screener = JobScreener()
     if not screener.api_key:
-        return {"success": False, "error": "GROQ_API_KEY not configured", "shortlisted": 0, "total": 0}
+        return {"error": "GROQ_API_KEY not configured", "shortlisted": 0, "total": 0}
     
     df = screener.load_data()
     if df is None:
-        return {"success": False, "error": "Could not load applications data", "shortlisted": 0, "total": 0}
+        return {"error": "Could not load applications data", "shortlisted": 0, "total": 0}
     
     job_criteria = {
         "job_id": job_id,
@@ -66,12 +48,13 @@ def run_resume_screener(job_id, role, min_experience, location, salary_range):
         screener.save_results(results, job_id)
     
     return {
-        "success": True,
         "shortlisted": len(results),
         "total": len(df),
         "file": f"data/shortlisted_{job_id}.xlsx"
     }
 
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "agents"))
+os.chdir(PROJECT_ROOT)
 
 def run_voice_caller(job_id, server_url, role, salary_range):
     """Run the voice caller agent."""
@@ -79,11 +62,11 @@ def run_voice_caller(job_id, server_url, role, salary_range):
     
     caller = VoiceCaller()
     if not caller.client:
-        return {"success": False, "error": "Twilio not configured", "calls_made": 0}
+        return {"error": "Twilio not configured", "calls_made": 0}
     
     df = caller.load_shortlisted_candidates(job_id)
     if df is None:
-        return {"success": False, "error": f"No shortlisted file for {job_id}", "calls_made": 0}
+        return {"error": f"No shortlisted file for {job_id}", "calls_made": 0}
     
     calls_made = 0
     for _, row in df.iterrows():
@@ -92,7 +75,7 @@ def run_voice_caller(job_id, server_url, role, salary_range):
         caller.make_call(mobile, name, role, salary_range, server_url)
         calls_made += 1
     
-    return {"success": True, "calls_made": calls_made}
+    return {"calls_made": calls_made}
 
 
 def run_scheduler():
@@ -107,7 +90,7 @@ def run_scheduler():
         df = pd.read_excel(agent.output_file)
         scheduled_count = len(df)
     
-    return {"success": True, "scheduled": scheduled_count}
+    return { "scheduled": scheduled_count}
 
 
 def run_calendar_agent():
@@ -115,24 +98,20 @@ def run_calendar_agent():
     from calendar_agent import CalendarAgent
     
     agent = CalendarAgent()
-    agent.process_interviews()  # Fixed: was process_schedule()
+    agent.process_interviews()  
     
-    return {"success": True, "message": "Calendar events created"}
+    return {"message": "Calendar events created"}
 
 
 def run_interview_agent():
     """Run the interview agent as a subprocess (needed because Playwright conflicts with Streamlit)."""
     import subprocess
-    
-    # Get paths
     script_path = os.path.join(PROJECT_ROOT, "agents", "interview_agent.py")
     venv_python = os.path.join(PROJECT_ROOT, "venv", "Scripts", "python.exe")
     
-    # Use venv python if it exists, otherwise system python
     python_cmd = venv_python if os.path.exists(venv_python) else "python"
     
     try:
-        # Use cmd /k to run command and keep window open
         cmd = f'cmd /k "cd /d {PROJECT_ROOT} && "{python_cmd}" "{script_path}""'
         
         result = subprocess.Popen(
@@ -140,9 +119,9 @@ def run_interview_agent():
             shell=True,
             cwd=PROJECT_ROOT
         )
-        return {"success": True, "message": "Interview agent started in new window", "pid": result.pid}
+        return {"message": "Interview agent started in new window", "pid": result.pid}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"error": str(e)}
 
 
 def run_transcript_scorer():
@@ -158,7 +137,7 @@ def run_transcript_scorer():
         df = pd.read_excel(scores_file)
         scored_count = len(df)
     
-    return {"success": True, "scored": scored_count}
+    return { "scored": scored_count}
 
 
 def run_offer_letter():
@@ -174,12 +153,9 @@ def run_offer_letter():
         df = pd.read_excel(sent_log)
         offers_sent = len(df)
     
-    return {"success": True, "offers_sent": offers_sent}
+    return {"offers_sent": offers_sent}
 
 
-# ============================================================================
-# STREAMLIT UI
-# ============================================================================
 
 def main():
     import streamlit as st
@@ -190,7 +166,6 @@ def main():
         layout="wide"
     )
     
-    # Custom CSS
     st.markdown("""
     <style>
         .main-header {
@@ -206,6 +181,7 @@ def main():
             border-radius: 10px;
             margin: 10px 0;
             border-left: 5px solid;
+            background-color: black;
         }
         .step-pending { border-color: #9e9e9e; background: #f5f5f5; }
         .step-current { border-color: #2196F3; background: #e3f2fd; }

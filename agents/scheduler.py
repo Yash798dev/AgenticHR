@@ -5,7 +5,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import glob
 
-# Load environment variables
 load_dotenv()
 
 class SchedulerAgent:
@@ -14,15 +13,12 @@ class SchedulerAgent:
         self.base_url = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
         self.model = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
         
-        # Initialize OpenAI client - compatible with both old and new versions
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
         
-        # Paths
         self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.data_path = os.path.join(self.root_dir, "data", "applications_data.xlsx")
         
-        # Check both potential locations for robustness
         self.transcript_dir = os.path.join(self.root_dir, "agents", "transcripts")
         if not os.path.exists(self.transcript_dir):
              self.transcript_dir = os.path.join(self.root_dir, "transcripts")
@@ -33,8 +29,6 @@ class SchedulerAgent:
         """Loads master data to map names to emails."""
         try:
             df = pd.read_excel(self.data_path)
-            # Create a lookup dictionary: Name -> Email
-            # Normalize names to lowercase for better matching
             email_map = {}
             for _, row in df.iterrows():
                 name = str(row.get('full_name', '')).strip().lower()
@@ -102,16 +96,10 @@ Return ONLY JSON:
 
         for filepath in files:
             filename = os.path.basename(filepath)
-            # Filename format: Name_CallSid.txt or just Name_....txt
-            # We assume name is the first part
-            
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
             
             print(f"Processing {filename}...", end="\r")
-            
-            # Extract basic info from Header if available
-            # (Our server saves "Candidate: Name" at top)
             candidate_name = "Unknown"
             for line in content.splitlines():
                 if line.startswith("Candidate:"):

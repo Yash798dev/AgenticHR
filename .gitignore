@@ -9,3 +9,6 @@ verified_transcripts/
 playwright_profile/
 agents/__pycache__
 website/node_modules
+platform/backend/node_modules
+platform/frontend/node_modules
+platform/frontend/.angular

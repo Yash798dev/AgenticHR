@@ -3,7 +3,6 @@ import pandas as pd
 from twilio.rest import Client
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 class VoiceCaller:
@@ -48,19 +47,12 @@ class VoiceCaller:
         # Sanitize phone number (basic)
         to_number = str(to_number).strip()
         if not to_number.startswith("+"):
-            # Assume India country code if missing
             if len(to_number) == 10:
                 to_number = "+91" + to_number
             else:
                  print(f"Warning: Phone number format might be incorrect for {candidate_name}: {to_number}")
 
-        # Construct Webhook URL with parameters
         from urllib.parse import urlencode, quote
-        
-        # NOTE: We can't pass params in 'url' easily for Twilio POST unless encoded or using query params.
-        # But Twilio 'url' attribute expects an endpoint that returns TwiML.
-        # We will use parameters in the URL query string.
-        # However, to pass data to the INITIAL /voice endpoint, we can use encoded params.
         
         params = {
             "candidate_name": candidate_name,
@@ -95,10 +87,6 @@ class VoiceCaller:
             return
 
         print(f"Found {len(df)} candidates to contact.")
-        
-        # Ask for details if not present (Salary/Role might vary per candidate or be fixed)
-        # We will ask once for simplicity if not in file, but 'role' might be needed.
-        # Assuming homogeneous job file.
         
         default_role = input("Enter Role Name (e.g. Python Dev): ").strip()
         default_salary = input("Enter Offered Salary Range (e.g. 10-12 LPA): ").strip()
