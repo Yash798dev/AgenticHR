@@ -12,6 +12,55 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+class StatusLogger:
+    """Writes structured status updates to a JSON file for the frontend to read."""
+    
+    def __init__(self, status_file=None):
+        self.status_file = status_file or os.path.join(os.getcwd(), "data", "interview_agent_status.json")
+        os.makedirs(os.path.dirname(self.status_file), exist_ok=True)
+        self.max_logs = 50
+        self._state = {
+            "pid": os.getpid(),
+            "started_at": datetime.now().isoformat(),
+            "state": "starting",
+            "current_candidate": None,
+            "logs": []
+        }
+        self._write()
+    
+    def log(self, message, log_type="info", state=None):
+        """Add a log entry and optionally update state."""
+        entry = {
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "type": log_type,
+            "message": message
+        }
+        self._state["logs"].append(entry)
+        if len(self._state["logs"]) > self.max_logs:
+            self._state["logs"] = self._state["logs"][-self.max_logs:]
+        if state:
+            self._state["state"] = state
+        self._write()
+        # Also print to terminal, handling Windows console encoding issues with emojis
+        try:
+            print(f"[{log_type.upper()}] {message}")
+        except UnicodeEncodeError:
+            # Fallback for Windows cmd that doesn't support emojis
+            clean_msg = message.encode('ascii', 'ignore').decode('ascii')
+            print(f"[{log_type.upper()}] {clean_msg}")
+    
+    def set_candidate(self, name):
+        self._state["current_candidate"] = name
+        self._write()
+    
+    def _write(self):
+        try:
+            with open(self.status_file, "w", encoding="utf-8") as f:
+                json.dump(self._state, f, indent=2)
+        except Exception:
+            pass
+
+
 class GroqClient:
     """Direct Groq API client - no openai library needed."""
     
@@ -123,7 +172,7 @@ class CaptionsListener:
                 last_response_lines.append(stripped)
         return ' '.join(last_response_lines).strip()
     
-    def listen(self, page, timeout=120):
+    def listen(self, page, timeout=5):
         """
         Listen for candidate response via captions.
         Returns only the LAST candidate response when silence is detected.
@@ -187,18 +236,13 @@ class InterviewAgent:
         self.groq = GroqClient()
         self.captions = CaptionsListener()  
         self.processed_meetings = set()
+        self.status = StatusLogger()
         
-        print("\n" + "="*60)
-        print("[START] INTERVIEW AGENT STARTED")
-        print("="*60)
-        print(f"[CONFIG] Schedule: {self.schedule_file}")
-        print(f"[CONFIG] Transcripts: {self.transcript_dir}")
-        print(f"[CONFIG] Schedule check: Every 1 minute")
-        print(f"[CONFIG] Join: 5 minutes before meeting")
-        print(f"[CONFIG] Interview starts: 1 min after meeting time")
-        print(f"[CONFIG] Using Google Meet Live Captions (no audio)")
-        print(f"[CONFIG] Silence threshold: {self.captions.silence_threshold}s")
-        print("="*60 + "\n")
+        self.status.log("Interview Agent started", "success", state="initializing")
+        self.status.log(f"Schedule file: {self.schedule_file}", "info")
+        self.status.log(f"Transcript dir: {self.transcript_dir}", "info")
+        self.status.log("Checking schedule every 1 minute", "info")
+        self.status.log("Will join meetings 5 min before start", "info", state="monitoring")
     
     def clean_caption_text(self, text):
         """Clean Google Meet caption noise from text."""
@@ -379,10 +423,10 @@ No markdown in responses."""
     def check_schedule(self):
         """Check schedule and join if meeting is due."""
         now = datetime.now()
-        print(f"\n[CHECK] Schedule check at {now.strftime('%H:%M:%S')}")
+        self.status.log(f"Checking schedule at {now.strftime('%H:%M:%S')}...", "info", state="monitoring")
         
         if not os.path.exists(self.schedule_file):
-            print(f"[ERROR] Schedule file not found: {self.schedule_file}")
+            self.status.log(f"Schedule file not found: {os.path.basename(self.schedule_file)}", "warning")
             return
         
         try:
@@ -416,28 +460,29 @@ No markdown in responses."""
                     try:
                         scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
                     except:
-                        print(f"[WARN] Could not parse time: {scheduled_time_str}")
+                        self.status.log(f"Could not parse time: {scheduled_time_str}", "warning")
                         continue
                 
                 time_diff_minutes = (scheduled_time - now).total_seconds() / 60
                 
+                if time_diff_minutes > 5:
+                    self.status.log(f"📅 {candidate_name} — {role} at {scheduled_time_str} (in {time_diff_minutes:.0f} min)", "info")
+                
                 if 0 <= time_diff_minutes <= 5:
-                    print(f"\n[MEETING FOUND]")
-                    print(f"   Candidate: {candidate_name}")
-                    print(f"   Email: {candidate_email}")
-                    print(f"   Role: {role}")
-                    print(f"   Scheduled: {scheduled_time_str}")
-                    print(f"   Joining in: {time_diff_minutes:.1f} min")
+                    self.status.log(f"🚀 MEETING FOUND: {candidate_name}", "success", state="joining")
+                    self.status.log(f"   Role: {role} | Scheduled: {scheduled_time_str}", "info")
+                    self.status.log(f"   Joining in {time_diff_minutes:.1f} minutes...", "info")
+                    self.status.set_candidate(candidate_name)
                     
                     self.processed_meetings.add(meeting_id)
                     self.join_meeting(meeting_link, candidate_name, candidate_email, role, scheduled_time)
                     
         except Exception as e:
-            print(f"[ERROR] Schedule error: {e}")
+            self.status.log(f"Schedule error: {e}", "error")
 
     def join_meeting(self, meeting_link, candidate_name, candidate_email, role, scheduled_time):
         """Join meeting, wait until 1 min after scheduled time, then conduct interview."""
-        print(f"\n[JOIN] Joining meeting for {candidate_name} ({candidate_email})...")
+        self.status.log(f"Joining Google Meet for {candidate_name}...", "info", state="joining")
         
         self.current_email = candidate_email
         self.current_role = role
@@ -495,10 +540,10 @@ No markdown in responses."""
                 join_btn.click(timeout=10000)
                 print("[OK] Clicked join button")
             except:
-                print("[WARN] Join button not found")
+                self.status.log("Join button not found, may already be in meeting", "warning")
             
             time.sleep(3)
-            print("[OK] In meeting!")
+            self.status.log(f"✅ Joined meeting for {candidate_name}!", "success")
             
             interview_start_time = scheduled_time + timedelta(minutes=1)
             now = datetime.now()
@@ -506,32 +551,33 @@ No markdown in responses."""
             
             if wait_seconds > 0:
                 wait_minutes = wait_seconds / 60
-                print(f"\n[WAIT] Meeting scheduled: {scheduled_time.strftime('%H:%M')}")
-                print(f"       Interview starts: {interview_start_time.strftime('%H:%M')} (2 min after meeting)")
-                print(f"       Waiting {wait_minutes:.1f} minutes...")
+                self.status.log(f"Waiting for interview start at {interview_start_time.strftime('%H:%M')}...", "info")
                 
                 while datetime.now() < interview_start_time:
                     remaining = (interview_start_time - datetime.now()).total_seconds()
                     if remaining > 60:
-                        print(f"       {int(remaining/60)} minutes remaining...")
+                        self.status.log(f"⏳ {int(remaining/60)} minutes until interview starts...", "info")
                         time.sleep(60)
                     else:
-                        print(f"       {int(remaining)} seconds remaining...")
+                        self.status.log(f"⏳ {int(remaining)} seconds until interview starts...", "info")
                         time.sleep(remaining)
                         break
             else:
-                print("[INFO] Already past interview start time, starting now...")
+                self.status.log("Already past interview start time, starting now...", "info")
             
-            print("\n[START] Starting interview...")
+            self.status.log(f"🎤 Starting interview with {candidate_name}!", "success", state="interviewing")
             
             self.conduct_interview(page, candidate_name, role)
             
-            print("[LEAVE] Leaving meeting...")
+            self.status.log("Leaving meeting...", "info")
             page.keyboard.press("Control+h")
             time.sleep(2)
+            self.status.log(f"✅ Interview with {candidate_name} completed!", "success", state="monitoring")
+            self.status.set_candidate(None)
             
         except Exception as e:
-            print(f"[ERROR] Meeting error: {e}")
+            self.status.log(f"Meeting error: {e}", "error", state="monitoring")
+            self.status.set_candidate(None)
         finally:
             if context:
                 context.close()
@@ -540,7 +586,7 @@ No markdown in responses."""
 
     def run(self):
         """Main loop - checks schedule every 1 minute."""
-        print("[RUN] Agent running. Press Ctrl+C to stop.\n")
+        self.status.log("Agent running — monitoring schedule every 1 minute", "success", state="monitoring")
         
         self.check_schedule()
         schedule.every(1).minutes.do(self.check_schedule)

@@ -301,4 +301,17 @@ router.delete('/:id', auth, authorize('admin', 'manager'), async (req, res) => {
     }
 });
 
+/**
+ * @route   GET /api/workflows/interview-agent/status
+ * @desc    Get live interview agent status (proxied from agent-bridge)
+ */
+router.get('/interview-agent/status', auth, async (req, res) => {
+    try {
+        const response = await axios.get(`${AGENT_BRIDGE_URL}/api/agents/interview/status`);
+        res.json(response.data);
+    } catch (error) {
+        res.json({ state: 'not_started', logs: [], current_candidate: null });
+    }
+});
+
 module.exports = router;

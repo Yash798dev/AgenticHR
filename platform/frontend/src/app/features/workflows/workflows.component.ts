@@ -141,13 +141,6 @@ const AGENT_CONFIG = [
                   <div *ngIf="step.agent === 'voice_caller'" class="input-row">
                     <input [(ngModel)]="voiceServerUrl" placeholder="Ngrok server URL (e.g., https://xyz.ngrok.app)">
                   </div>
-                  
-                  <!-- Offer Letter needs candidate details -->
-                  <div *ngIf="step.agent === 'offer_letter'" class="input-row">
-                    <input [(ngModel)]="offerEmail" placeholder="Candidate email">
-                    <input [(ngModel)]="offerSalary" placeholder="Salary (e.g., 12 LPA)">
-                    <input [(ngModel)]="offerStartDate" placeholder="Start date">
-                  </div>
                 </div>
               </div>
               
@@ -169,6 +162,30 @@ const AGENT_CONFIG = [
                 <span class="result" *ngIf="step.result">
                   {{ formatResult(step.result) }}
                 </span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Interview Agent Live Status Panel -->
+          <div class="interview-live-panel" *ngIf="interviewLogs.length > 0">
+            <div class="live-header">
+              <span class="live-dot" [class.active]="interviewState === 'monitoring' || interviewState === 'joining' || interviewState === 'interviewing'"></span>
+              <strong>Interview Agent</strong>
+              <span class="live-state">
+                {{ interviewState === 'monitoring' ? '🔍 Monitoring Schedule' : 
+                   interviewState === 'joining' ? '🚀 Joining Meeting' : 
+                   interviewState === 'interviewing' ? '🎤 Interview In Progress' :
+                   interviewState === 'not_started' ? '⏸ Not Started' : '⏳ ' + interviewState }}
+              </span>
+              <span class="live-candidate" *ngIf="interviewCandidate">• {{ interviewCandidate }}</span>
+            </div>
+            <div class="live-logs" id="interviewLogs">
+              <div class="log-entry" *ngFor="let log of interviewLogs" [class]="'log-' + log.type">
+                <span class="log-time">{{ log.timestamp }}</span>
+                <span class="log-icon">
+                  {{ log.type === 'success' ? '✅' : log.type === 'warning' ? '⚠️' : log.type === 'error' ? '❌' : '▸' }}
+                </span>
+                <span class="log-msg">{{ log.message }}</span>
               </div>
             </div>
           </div>
@@ -561,6 +578,61 @@ const AGENT_CONFIG = [
       color: #4ade80;
     }
     
+    /* Interview Agent Live Status Panel */
+    .interview-live-panel {
+      margin-top: 2rem;
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+    
+    .live-header {
+      background: #1a1a1a;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid #2a2a2a;
+      font-size: 0.85rem;
+    }
+    
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      opacity: 0.3;
+    }
+    .live-dot.active {
+      opacity: 1;
+      box-shadow: 0 0 8px #4ade80;
+      animation: pulse 2s infinite;
+    }
+    
+    .live-state { color: #888; margin-left: auto; }
+    .live-candidate { color: #fff; }
+    
+    .live-logs {
+      padding: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    
+    .log-entry { margin-bottom: 0.5rem; display: flex; gap: 0.5rem; }
+    .log-time { color: #666; font-size: 0.75rem; min-width: 60px; }
+    .log-icon { width: 16px; text-align: center; }
+    .log-msg { color: #ccc; }
+    
+    .log-success .log-msg { color: #4ade80; }
+    .log-warning .log-msg { color: #eab308; }
+    .log-error .log-msg { color: #ef4444; }
+    .log-info .log-msg { color: #a1a1aa; }
+
+    
     .advance-section {
       margin-top: 1.5rem;
       padding-top: 1.5rem;
@@ -770,19 +842,17 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
   workflowName = '';
 
   voiceServerUrl = '';
-  offerEmail = '';
-  offerSalary = '';
-  offerStartDate = '';
 
   private pollInterval: any;
+  private interviewPollInterval: any;
+  interviewLogs: any[] = [];
+  interviewState = 'not_started';
+  interviewCandidate: string | null = null;
 
   ngOnInit(): void {
     this.loadWorkflows();
   }
 
-  ngOnDestroy(): void {
-    if (this.pollInterval) clearInterval(this.pollInterval);
-  }
 
   loadWorkflows(): void {
     this.http.get<Workflow[]>(`${this.apiUrl}/workflows`).subscribe({
@@ -908,13 +978,14 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
 
     if (currentStep.agent === 'voice_caller') {
       additionalData.serverUrl = this.voiceServerUrl;
-    } else if (currentStep.agent === 'offer_letter') {
-      additionalData.candidateEmail = this.offerEmail;
-      additionalData.salary = this.offerSalary;
-      additionalData.startDate = this.offerStartDate;
     }
 
     this.isRunning.set(true);
+
+    // Start interview status polling if this is the interview agent
+    if (currentStep.agent === 'interview_agent') {
+      this.startInterviewStatusPolling();
+    }
 
     this.http.post(`${this.apiUrl}/workflows/${wf._id}/run-step`, additionalData).subscribe({
       next: () => {
@@ -943,6 +1014,40 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
       next: (data) => this.selected.set(data)
     });
     this.loadWorkflows();
+  }
+
+  startInterviewStatusPolling(): void {
+    // Clear any existing interval
+    if (this.interviewPollInterval) clearInterval(this.interviewPollInterval);
+    
+    // Poll immediately
+    this.fetchInterviewStatus();
+    
+    // Then poll every 3 seconds
+    this.interviewPollInterval = setInterval(() => {
+      this.fetchInterviewStatus();
+    }, 3000);
+  }
+
+  fetchInterviewStatus(): void {
+    this.http.get<any>(`${this.apiUrl}/workflows/interview-agent/status`).subscribe({
+      next: (data) => {
+        this.interviewLogs = data.logs || [];
+        this.interviewState = data.state || 'not_started';
+        this.interviewCandidate = data.current_candidate || null;
+        
+        // Auto-scroll the log panel
+        setTimeout(() => {
+          const el = document.getElementById('interviewLogs');
+          if (el) el.scrollTop = el.scrollHeight;
+        }, 50);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+    if (this.interviewPollInterval) clearInterval(this.interviewPollInterval);
   }
 
   canAdvance(): boolean {

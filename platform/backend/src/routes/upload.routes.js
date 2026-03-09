@@ -47,14 +47,25 @@ router.post('/applications', auth, upload.single('file'), async (req, res) => {
         const sourcePath = req.file.path;
         const destPath = path.join(__dirname, '../../../../data/applications_data.xlsx');
 
-        fs.copyFileSync(sourcePath, destPath);
+        try {
+            // First try to remove the destination file if it exists
+            if (fs.existsSync(destPath)) {
+                fs.unlinkSync(destPath);
+            }
+            // Use rename instead of copy to avoid locking issues where possible
+            fs.renameSync(sourcePath, destPath);
+        } catch (copyErr) {
+            console.warn(`Rename failed (${copyErr.code}), falling back to copy...`);
+            fs.copyFileSync(sourcePath, destPath);
+            fs.unlinkSync(sourcePath); // Clean up original upload
+        }
 
         res.json({
             message: 'File uploaded successfully',
             filename: req.file.filename,
             originalName: req.file.originalname,
             size: req.file.size,
-            path: req.file.path
+            path: destPath
         });
     } catch (error) {
         console.error('Upload error:', error);

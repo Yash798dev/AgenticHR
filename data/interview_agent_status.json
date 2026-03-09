@@ -1,0 +1,128 @@
+{
+  "pid": 6296,
+  "started_at": "2026-03-09T19:46:56.613130",
+  "state": "monitoring",
+  "current_candidate": null,
+  "logs": [
+    {
+      "timestamp": "19:46:56",
+      "type": "success",
+      "message": "Interview Agent started"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Schedule file: C:\\Users\\yashw\\Desktop\\AgenticHR\\data\\final_interview_schedule.xlsx"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Transcript dir: C:\\Users\\yashw\\Desktop\\AgenticHR\\unverified_transcripts"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Checking schedule every 1 minute"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Will join meetings 5 min before start"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "success",
+      "message": "Agent running \u2014 monitoring schedule every 1 minute"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Checking schedule at 19:46:56..."
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "success",
+      "message": "\ud83d\ude80 MEETING FOUND: Anita Verma"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "   Role: frontend developer | Scheduled: 09-03-2026 07:50 PM"
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "   Joining in 3.1 minutes..."
+    },
+    {
+      "timestamp": "19:46:56",
+      "type": "info",
+      "message": "Joining Google Meet for Anita Verma..."
+    },
+    {
+      "timestamp": "19:47:15",
+      "type": "success",
+      "message": "\u2705 Joined meeting for Anita Verma!"
+    },
+    {
+      "timestamp": "19:47:15",
+      "type": "info",
+      "message": "Waiting for interview start at 19:51..."
+    },
+    {
+      "timestamp": "19:47:15",
+      "type": "info",
+      "message": "\u23f3 3 minutes until interview starts..."
+    },
+    {
+      "timestamp": "19:48:15",
+      "type": "info",
+      "message": "\u23f3 2 minutes until interview starts..."
+    },
+    {
+      "timestamp": "19:49:15",
+      "type": "info",
+      "message": "\u23f3 1 minutes until interview starts..."
+    },
+    {
+      "timestamp": "19:50:15",
+      "type": "info",
+      "message": "\u23f3 44 seconds until interview starts..."
+    },
+    {
+      "timestamp": "19:51:00",
+      "type": "success",
+      "message": "\ud83c\udfa4 Starting interview with Anita Verma!"
+    },
+    {
+      "timestamp": "19:55:24",
+      "type": "error",
+      "message": "Meeting error: Target page, context or browser has been closed"
+    },
+    {
+      "timestamp": "19:55:24",
+      "type": "error",
+      "message": "Schedule error: Target page, context or browser has been closed"
+    },
+    {
+      "timestamp": "19:56:25",
+      "type": "info",
+      "message": "Checking schedule at 19:56:25..."
+    },
+    {
+      "timestamp": "19:57:25",
+      "type": "info",
+      "message": "Checking schedule at 19:57:25..."
+    },
+    {
+      "timestamp": "19:58:26",
+      "type": "info",
+      "message": "Checking schedule at 19:58:26..."
+    },
+    {
+      "timestamp": "19:59:26",
+      "type": "info",
+      "message": "Checking schedule at 19:59:26..."
+    }
+  ]
+}

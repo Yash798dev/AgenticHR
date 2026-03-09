@@ -68,9 +68,6 @@ class TranscriptScorerRequest(BaseModel):
 
 class OfferLetterRequest(BaseModel):
     job_id: str
-    candidate_email: str
-    salary: str
-    start_date: str
 
 
 class JobStatusResponse(BaseModel):
@@ -171,15 +168,21 @@ async def run_voice_caller_task(task_id: str, request: VoiceCallerRequest):
 
 
 async def run_calendar_task(task_id: str, request: CalendarAgentRequest):
-    """Execute calendar agent."""
+    """Execute scheduler agent first (to create scheduled_interviews.xlsx), then calendar agent."""
     try:
         update_task(task_id, "running")
         
+        # Step 1: Run Scheduler to extract interview times from voice call transcripts
+        from agents.scheduler import SchedulerAgent
+        scheduler = SchedulerAgent()
+        scheduler.process_transcripts()
+        
+        # Step 2: Run Calendar Agent to create Google Calendar events
         from agents.calendar_agent import CalendarAgent
         agent = CalendarAgent()
-        result = agent.schedule_interviews(request.job_id)
+        agent.process_interviews()
         
-        update_task(task_id, "completed", result=result)
+        update_task(task_id, "completed", result={"message": "Scheduler + Calendar events processed"})
         
     except Exception as e:
         update_task(task_id, "failed", error=str(e))
@@ -191,16 +194,18 @@ async def run_interview_task(task_id: str, request: InterviewAgentRequest):
         update_task(task_id, "running")
         
         import subprocess
-        agent_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents", "interview_agent.py")
+        agent_path = os.path.join(ROOT_DIR, "agents", "interview_agent.py")
         
+        # Launch as detached process - it runs a loop checking schedule every 1 min
         process = subprocess.Popen(
-            [sys.executable, agent_path, "--job-id", request.job_id],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            [sys.executable, agent_path],
+            cwd=ROOT_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
         
         update_task(task_id, "completed", result={
-            "message": "Interview agent started",
+            "message": "Interview agent started (monitoring schedule in background)",
             "pid": process.pid,
             "job_id": request.job_id
         })
@@ -216,9 +221,18 @@ async def run_transcript_scorer_task(task_id: str, request: TranscriptScorerRequ
         
         from agents.transcript_scorer_agent import TranscriptScorer
         scorer = TranscriptScorer()
-        result = scorer.score_all(request.job_id)
+        scorer.process_existing_files()
         
-        update_task(task_id, "completed", result=result)
+        # Read the scores to return as result
+        import pandas as pd
+        scores_file = os.path.join(ROOT_DIR, "data", "interview_scores.xlsx")
+        result_data = {"message": "Transcripts scored successfully", "scores_count": 0}
+        
+        if os.path.exists(scores_file):
+            df = pd.read_excel(scores_file)
+            result_data["scores_count"] = len(df)
+            
+        update_task(task_id, "completed", result=result_data)
         
     except Exception as e:
         update_task(task_id, "failed", error=str(e))
@@ -231,14 +245,18 @@ async def run_offer_letter_task(task_id: str, request: OfferLetterRequest):
         
         from agents.offer_letter_agent import OfferLetterAgent
         agent = OfferLetterAgent()
-        result = agent.generate_and_send(
-            job_id=request.job_id,
-            candidate_email=request.candidate_email,
-            salary=request.salary,
-            start_date=request.start_date
-        )
+        agent.process_candidates()
         
-        update_task(task_id, "completed", result=result)
+        # Read the sent log to return as result
+        import pandas as pd
+        sent_log = os.path.join(ROOT_DIR, "data", "sent_offers.xlsx")
+        result_data = {"message": "Offer letters processed successfully", "offers_sent": 0}
+        
+        if os.path.exists(sent_log):
+            df = pd.read_excel(sent_log)
+            result_data["offers_sent"] = len(df)
+        
+        update_task(task_id, "completed", result=result_data)
         
     except Exception as e:
         update_task(task_id, "failed", error=str(e))
@@ -248,6 +266,34 @@ async def run_offer_letter_task(task_id: str, request: OfferLetterRequest):
 @app.get("/")
 async def root():
     return {"message": "Agentic HR Agent Bridge API", "version": "1.0.0"}
+
+
+from fastapi import Request
+from agents.voice_server import voice_start, process_speech as voice_process_speech
+
+@app.post("/voice")
+async def voice_callback(request: Request):
+    """Twilio webhook - delegates to voice_server.py for AI conversation."""
+    return await voice_start(request)
+
+@app.post("/process_speech")
+async def process_speech_callback(request: Request):
+    """Twilio gather callback - delegates to voice_server.py for LLM response."""
+    return await voice_process_speech(request)
+
+
+@app.get("/api/agents/interview/status")
+async def get_interview_status():
+    """Returns the current interview agent status from the JSON status file."""
+    import json
+    status_file = os.path.join(ROOT_DIR, "data", "interview_agent_status.json")
+    if not os.path.exists(status_file):
+        return {"state": "not_started", "logs": [], "current_candidate": None}
+    try:
+        with open(status_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"state": "error", "logs": [], "current_candidate": None}
 
 
 @app.get("/health")
