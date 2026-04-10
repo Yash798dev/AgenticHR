@@ -156,10 +156,8 @@ router.post('/:id/run-step', auth, agentLimiter, async (req, res) => {
             case 'offer_letter':
                 agentEndpoint = '/api/agents/offer-letter/run';
                 requestBody = {
-                    job_id: job.jobId,
-                    candidate_email: req.body.candidateEmail || '',
-                    salary: req.body.salary || '',
-                    start_date: req.body.startDate || ''
+                    action: req.body.action,
+                    candidate_email: req.body.candidateEmail
                 };
                 break;
 
@@ -220,14 +218,7 @@ router.get('/:id/step-status', auth, async (req, res) => {
                 workflow.stats.totalCandidates = taskStatus.result.total_candidates;
                 workflow.stats.shortlisted = taskStatus.result.shortlisted;
             }
-            if (taskStatus.status === 'completed' && workflow.config.autoAdvance) {
-                if (workflow.currentStep < workflow.steps.length - 1) {
-                    workflow.currentStep += 1;
-                } else {
-                    workflow.status = 'completed';
-                    workflow.completedAt = new Date();
-                }
-            }
+            // Auto-advance disabled: user must manually click "Advance to Next Step"
 
             await workflow.save();
         }
@@ -311,6 +302,32 @@ router.get('/interview-agent/status', auth, async (req, res) => {
         res.json(response.data);
     } catch (error) {
         res.json({ state: 'not_started', logs: [], current_candidate: null });
+    }
+});
+
+/**
+ * @route   GET /api/workflows/:id/candidates
+ * @desc    Get list of candidates for the offer letter step
+ */
+router.get('/:id/candidates', auth, async (req, res) => {
+    try {
+        const workflow = await Workflow.findOne({
+            _id: req.params.id,
+            organization: req.user.organization._id
+        }).populate('job');
+
+        if (!workflow) {
+            return res.status(404).json({ message: 'Workflow not found' });
+        }
+
+        const response = await axios.get(`${AGENT_BRIDGE_URL}/api/agents/offer-letter/candidates`, {
+            params: { job_id: workflow.job.jobId }
+        });
+        
+        res.json(response.data);
+    } catch (error) {
+        console.error('Fetch candidates error:', error);
+        res.status(500).json({ message: 'Failed to fetch candidates' });
     }
 });
 

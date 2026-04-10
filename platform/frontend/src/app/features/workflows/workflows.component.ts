@@ -141,6 +141,49 @@ const AGENT_CONFIG = [
                   <div *ngIf="step.agent === 'voice_caller'" class="input-row">
                     <input [(ngModel)]="voiceServerUrl" placeholder="Ngrok server URL (e.g., https://xyz.ngrok.app)">
                   </div>
+                  
+                  <!-- Offer Letter needs candidate list -->
+                  <div *ngIf="step.agent === 'offer_letter'" class="candidates-table-container">
+                    <button class="btn-refresh" (click)="loadOfferCandidates()">↻ Refresh Candidates</button>
+                    <table class="candidates-table" *ngIf="offerCandidates.length > 0">
+                      <thead>
+                        <tr>
+                          <th>Candidate</th>
+                          <th>Score</th>
+                          <th>Rec.</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let candidate of offerCandidates">
+                          <td>
+                            <strong>{{ candidate.name }}</strong>
+                            <small>{{ candidate.email }}</small>
+                          </td>
+                          <td>{{ candidate.score }}</td>
+                          <td>
+                            <span class="rec-badge" [class.success]="candidate.recommendation === 'Strongly Recommend' || candidate.recommendation === 'Recommend'" [class.warning]="candidate.recommendation === 'Consider'">
+                              {{ candidate.recommendation }}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="status-text" [class.completed]="candidate.status === 'Sent'" [class.failed]="candidate.status === 'Rejected'">{{ candidate.status }}</span>
+                          </td>
+                          <td class="action-cell">
+                            <button *ngIf="candidate.status === 'Pending'" class="btn-sm btn-accept" (click)="processCandidate(candidate, 'accept')" [disabled]="candidate.processing">Accept</button>
+                            <button *ngIf="candidate.status === 'Pending'" class="btn-sm btn-reject" (click)="processCandidate(candidate, 'reject')" [disabled]="candidate.processing">Reject</button>
+                            <span *ngIf="candidate.processing" class="spinner-sm"></span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p class="empty" *ngIf="offerCandidates.length === 0">No eligible candidates available yet or waiting to load...</p>
+                    
+                    <button class="btn-run alt" style="margin-top: 1rem;" (click)="markOfferStepComplete()">
+                       End Offer Step
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -149,7 +192,7 @@ const AGENT_CONFIG = [
                 
                 <!-- Run button for current step -->
                 <button class="btn-run" 
-                        *ngIf="i === selected()?.currentStep && step.status !== 'completed' && step.status !== 'running'"
+                        *ngIf="i === selected()?.currentStep && step.status !== 'completed' && step.status !== 'running' && step.agent !== 'offer_letter'"
                         (click)="runCurrentStep()"
                         [disabled]="isRunning()">
                   {{ step.status === 'failed' ? '↺ Retry' : '▶ Run' }}
@@ -632,6 +675,35 @@ const AGENT_CONFIG = [
     .log-error .log-msg { color: #ef4444; }
     .log-info .log-msg { color: #a1a1aa; }
 
+    /* Candidates Table */
+    .candidates-table-container { margin-top: 1rem; width: 100%; overflow-x: auto; background: #0a0a0a; border: 1px solid #1a1a1a; padding: 1rem; border-radius: 8px; }
+    .candidates-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .candidates-table th, .candidates-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #1a1a1a; }
+    .candidates-table th { color: #888; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05rem; }
+    .candidates-table td strong { display: block; font-size: 0.9rem; color: #fff; }
+    .candidates-table td small { color: #666; font-size: 0.75rem; }
+    .rec-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; }
+    .rec-badge.success { background: rgba(74, 222, 128, 0.1); color: #4ade80; }
+    .rec-badge.warning { background: rgba(234, 179, 8, 0.1); color: #eab308; }
+    .action-cell { display: flex; gap: 0.5rem; align-items: center; }
+    .btn-sm { padding: 0.4rem 0.6rem; border: none; border-radius: 4px; font-size: 0.75rem; cursor: pointer; font-weight: bold; }
+    .btn-accept { background: #4ade80; color: #000; }
+    .btn-reject { background: #ef4444; color: #fff; }
+    .btn-accept:disabled, .btn-reject:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-refresh { background: transparent; border: 1px solid #333; color: #888; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; margin-bottom: 1rem; }
+    .btn-refresh:hover { background: #1a1a1a; color: #fff; }
+    .btn-run.alt { background: transparent; border: 1px solid #333; color: #fff; }
+    
+    .spinner-sm {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #333;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+
     
     .advance-section {
       margin-top: 1.5rem;
@@ -848,6 +920,7 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
   interviewLogs: any[] = [];
   interviewState = 'not_started';
   interviewCandidate: string | null = null;
+  offerCandidates: any[] = [];
 
   ngOnInit(): void {
     this.loadWorkflows();
@@ -864,7 +937,13 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
   selectWorkflow(w: Workflow): void {
     this.selected.set(w);
     this.http.get<Workflow>(`${this.apiUrl}/workflows/${w._id}`).subscribe({
-      next: data => this.selected.set(data)
+      next: data => {
+        this.selected.set(data);
+        const currentStep = data.steps[data.currentStep];
+        if (currentStep && currentStep.agent === 'offer_letter' && currentStep.status !== 'completed') {
+           this.loadOfferCandidates();
+        }
+      }
     });
   }
 
@@ -1002,12 +1081,21 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
           if (res.stepStatus === 'completed' || res.stepStatus === 'failed') {
             clearInterval(this.pollInterval);
             this.isRunning.set(false);
-            this.refreshWorkflow(workflowId);
+            
+            // Refresh the workflow - user must manually advance to next step
+            this.http.get<Workflow>(`${this.apiUrl}/workflows/${workflowId}`).subscribe({
+              next: (data) => {
+                this.selected.set(data);
+                this.loadWorkflows();
+              }
+            });
           }
         }
       });
     }, 2000);
   }
+
+
 
   refreshWorkflow(id: string): void {
     this.http.get<Workflow>(`${this.apiUrl}/workflows/${id}`).subscribe({
@@ -1078,5 +1166,42 @@ export class WorkflowsComponent implements OnInit, OnDestroy {
       return `${result.calls_initiated} calls`;
     }
     return '✓ Done';
+  }
+
+  loadOfferCandidates(): void {
+    const wf = this.selected();
+    if (!wf) return;
+    this.http.get<any>(`${this.apiUrl}/workflows/${wf._id}/candidates`).subscribe({
+      next: (res) => {
+        this.offerCandidates = res.candidates || [];
+      }
+    });
+  }
+
+  processCandidate(candidate: any, action: 'accept' | 'reject'): void {
+    const wf = this.selected();
+    if (!wf) return;
+    
+    candidate.processing = true;
+    
+    this.http.post(`${this.apiUrl}/workflows/${wf._id}/run-step`, {
+      action: action,
+      candidateEmail: candidate.email
+    }).subscribe({
+      next: () => {
+         // Start normal polling to wait for task completion, which will eventually refresh UI
+         this.startPolling(wf._id);
+      },
+      error: () => {
+         candidate.processing = false;
+         alert('Failed to process candidate');
+      }
+    });
+  }
+
+  markOfferStepComplete(): void {
+    const wf = this.selected();
+    if (!wf) return;
+    this.advanceToNext();
   }
 }

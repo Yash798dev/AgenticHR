@@ -1,359 +1,172 @@
-import { Component, OnInit, inject } from '@angular/core';
+﻿import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { WorkflowService, Workflow, Job } from '../../core/services/workflow.service';
 
 @Component({
-    selector: 'app-dashboard',
-    standalone: true,
-    imports: [CommonModule, RouterLink],
-    template: `
-    <div class="dashboard">
-      <header class="dash-header">
-        <div class="header-left">
-          <h1>Dashboard</h1>
-          <span class="org-name">{{ authService.organization()?.name }}</span>
-        </div>
-        <div class="header-right">
-          <span class="user-info">{{ authService.user()?.firstName }}</span>
-          <button class="btn-outline" (click)="authService.logout()">Logout</button>
-        </div>
-      </header>
-      
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-icon">◆</span>
-          <div class="stat-content">
+  selector: 'app-dashboard',
+  standalone: true,
+  imports: [CommonModule, RouterLink, RouterLinkActive],
+  template: `
+    <div class="page">
+      <aside class="sidebar">
+        <div class="brand">AGENTIC HR</div>
+        <nav class="nav">
+          <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+          <a routerLink="/workflows" routerLinkActive="active">Workflows</a>
+          <a routerLink="/jobs" routerLinkActive="active">Jobs</a>
+          <a routerLink="/files" routerLinkActive="active">Files</a>
+          <a routerLink="/billing" routerLinkActive="active">Billing</a>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h1>Dashboard</h1>
+            <p>{{ authService.organization()?.name }}</p>
+          </div>
+          <div class="top-actions">
+            <span>{{ authService.user()?.firstName }} {{ authService.user()?.lastName }}</span>
+            <button (click)="authService.logout()">Logout</button>
+          </div>
+        </header>
+
+        <section class="stats-grid">
+          <article class="card">
             <h3>{{ workflows.length }}</h3>
+            <p>Total Workflows</p>
+          </article>
+          <article class="card">
+            <h3>{{ getActiveWorkflows() }}</h3>
             <p>Active Workflows</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">◇</span>
-          <div class="stat-content">
+          </article>
+          <article class="card">
             <h3>{{ jobs.length }}</h3>
-            <p>Open Jobs</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">○</span>
-          <div class="stat-content">
-            <h3>{{ getTotalCandidates() }}</h3>
-            <p>Candidates</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">△</span>
-          <div class="stat-content">
-            <h3>{{ getTotalOffered() }}</h3>
-            <p>Offers Sent</p>
-          </div>
-        </div>
-      </div>
-      
-      <div class="dashboard-grid">
-        <section class="card">
-          <div class="card-header">
-            <h2>Recent Workflows</h2>
-            <a routerLink="/workflows" class="link">View all →</a>
-          </div>
-          <div class="workflow-list" *ngIf="workflows.length; else noWorkflows">
-            <div class="workflow-item" *ngFor="let w of workflows.slice(0, 5)">
-              <div class="workflow-info">
-                <strong>{{ w.name }}</strong>
-                <span>{{ w.job?.title }}</span>
-              </div>
-              <div class="workflow-progress">
-                <div class="progress-bar">
-                  <div class="progress-fill" [style.width.%]="getProgress(w)"></div>
+            <p>Total Jobs</p>
+          </article>
+          <article class="card">
+            <h3>{{ uploadedFiles }}</h3>
+            <p>Data Files</p>
+          </article>
+        </section>
+
+        <section class="panels">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>Recent Workflows</h2>
+              <a routerLink="/workflows">Open</a>
+            </div>
+            <div *ngIf="workflows.length; else noWorkflows">
+              <div class="row" *ngFor="let workflow of workflows.slice(0, 6)">
+                <div>
+                  <strong>{{ workflow.name }}</strong>
+                  <small>{{ workflow.job.title }}</small>
                 </div>
-                <span class="status" [class]="w.status">{{ w.status }}</span>
+                <span class="pill" [class]="workflow.status">{{ workflow.status }}</span>
               </div>
             </div>
-          </div>
-          <ng-template #noWorkflows>
-            <p class="empty">No workflows yet. <a routerLink="/workflows">Create one</a></p>
-          </ng-template>
-        </section>
-        
-        <section class="card">
-          <div class="card-header">
-            <h2>Open Jobs</h2>
-            <a routerLink="/jobs" class="link">View all →</a>
-          </div>
-          <div class="job-list" *ngIf="jobs.length; else noJobs">
-            <div class="job-item" *ngFor="let j of jobs.slice(0, 5)">
-              <div class="job-info">
-                <strong>{{ j.title }}</strong>
-                <span>{{ j.jobId }}</span>
-              </div>
-              <div class="job-pipeline">
-                <span>{{ j.pipeline?.screened || 0 }} screened</span>
+            <ng-template #noWorkflows>
+              <p class="muted">No workflows yet.</p>
+            </ng-template>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h2>Recent Jobs</h2>
+              <a routerLink="/jobs">Open</a>
+            </div>
+            <div *ngIf="jobs.length; else noJobs">
+              <div class="row" *ngFor="let job of jobs.slice(0, 6)">
+                <div>
+                  <strong>{{ job.title }}</strong>
+                  <small>{{ job.jobId }} - {{ job.role }}</small>
+                </div>
+                <span class="pill" [class]="job.status">{{ job.status }}</span>
               </div>
             </div>
-          </div>
-          <ng-template #noJobs>
-            <p class="empty">No open jobs. <a routerLink="/jobs">Create one</a></p>
-          </ng-template>
+            <ng-template #noJobs>
+              <p class="muted">No jobs yet.</p>
+            </ng-template>
+          </article>
         </section>
-      </div>
-      
-      <nav class="side-nav">
-        <a routerLink="/dashboard" class="nav-item active">
-          <span class="nav-icon">◎</span>
-          <span>Dashboard</span>
-        </a>
-        <a routerLink="/workflows" class="nav-item">
-          <span class="nav-icon">◆</span>
-          <span>Workflows</span>
-        </a>
-        <a routerLink="/jobs" class="nav-item">
-          <span class="nav-icon">◇</span>
-          <span>Jobs</span>
-        </a>
-        <a routerLink="/billing" class="nav-item">
-          <span class="nav-icon">□</span>
-          <span>Billing</span>
-        </a>
-      </nav>
+      </main>
     </div>
   `,
-    styles: [`
-    .dashboard {
-      min-height: 100vh;
-      background: #0a0a0a;
-      padding-left: 220px;
+  styles: [`
+    .page { min-height: 100vh; background: #0a0a0a; color: #fff; display: grid; grid-template-columns: 220px 1fr; }
+    .sidebar { border-right: 1px solid #242424; padding: 20px 14px; background: #0d0d0d; }
+    .brand { font-size: 14px; letter-spacing: 0.12em; font-weight: 600; margin-bottom: 20px; }
+    .nav { display: grid; gap: 6px; }
+    .nav a { color: #bcbcbc; text-decoration: none; padding: 10px 12px; border-radius: 6px; border: 1px solid transparent; }
+    .nav a.active, .nav a:hover { color: #fff; background: #151515; border-color: #2f2f2f; }
+
+    .content { padding: 24px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .topbar h1 { font-size: 24px; margin: 0; }
+    .topbar p { color: #9b9b9b; margin: 4px 0 0; }
+    .top-actions { display: flex; gap: 10px; align-items: center; color: #bdbdbd; }
+    .top-actions button { background: #fff; color: #000; border: 0; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+    .top-actions button:hover:not(:disabled) { box-shadow: 0 8px 24px rgba(255,255,255,.08); }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 18px; }
+    .card { background: #111; border: 1px solid #252525; border-radius: 10px; padding: 16px; }
+    .card { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+    .card:hover { transform: translateY(-1px); border-color: #3a3a3a; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .card h3 { margin: 0; font-size: 28px; }
+    .card p { margin: 4px 0 0; color: #a1a1a1; }
+
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel { background: #111; border: 1px solid #252525; border-radius: 10px; padding: 14px; }
+    .panel { transition: border-color .2s ease, box-shadow .2s ease; }
+    .panel:hover { border-color: #363636; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .panel-head h2 { font-size: 16px; margin: 0; }
+    .panel-head a { color: #fff; text-decoration: none; border-bottom: 1px solid #616161; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #1f1f1f; }
+    .row { transition: background-color .2s ease; }
+    .row:hover { background: #151515; }
+    .row:last-child { border-bottom: 0; }
+    .row strong { display: block; font-size: 14px; }
+    .row small { color: #9f9f9f; }
+    .pill { border: 1px solid #444; border-radius: 999px; padding: 3px 10px; font-size: 11px; text-transform: uppercase; color: #cfcfcf; }
+    .pill.active { border-color: #d0d0d0; color: #fff; }
+    .pill.completed { border-color: #8b8b8b; color: #f5f5f5; }
+    .pill.failed { border-color: #6b6b6b; color: #d4d4d4; }
+    .pill.open { border-color: #d0d0d0; color: #fff; }
+    .muted { color: #969696; }
+
+    @media (max-width: 1000px) {
+      .page { grid-template-columns: 1fr; }
+      .sidebar { position: sticky; top: 0; z-index: 2; border-right: 0; border-bottom: 1px solid #242424; }
+      .nav { grid-template-columns: repeat(5, minmax(0,1fr)); }
+      .nav a { text-align: center; font-size: 12px; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .panels { grid-template-columns: 1fr; }
+      .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
     }
-    
-    .side-nav {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 200px;
-      height: 100vh;
-      background: #111;
-      border-right: 1px solid #222;
-      padding: 2rem 1rem;
-    }
-    
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1rem;
-      color: #888;
-      text-decoration: none;
-      border-radius: 6px;
-      margin-bottom: 0.25rem;
-      transition: all 0.2s;
-    }
-    
-    .nav-item:hover, .nav-item.active {
-      background: #1a1a1a;
-      color: #fff;
-    }
-    
-    .nav-icon { font-size: 1.1rem; }
-    
-    .dash-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1.5rem 2rem;
-      border-bottom: 1px solid #222;
-    }
-    
-    .header-left h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-    
-    .org-name {
-      color: #666;
-      font-size: 0.85rem;
-      margin-left: 1rem;
-    }
-    
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    
-    .user-info { color: #888; }
-    
-    .btn-outline {
-      padding: 0.5rem 1rem;
-      background: transparent;
-      border: 1px solid #333;
-      color: #888;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    
-    .btn-outline:hover {
-      border-color: #fff;
-      color: #fff;
-    }
-    
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      padding: 2rem;
-    }
-    
-    .stat-card {
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    
-    .stat-icon {
-      font-size: 1.5rem;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #1a1a1a;
-      border-radius: 50%;
-    }
-    
-    .stat-content h3 {
-      font-size: 1.75rem;
-      font-weight: 600;
-    }
-    
-    .stat-content p {
-      color: #666;
-      font-size: 0.85rem;
-    }
-    
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      padding: 0 2rem 2rem;
-    }
-    
-    .card {
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 1.5rem;
-    }
-    
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    
-    .card-header h2 {
-      font-size: 1rem;
-      font-weight: 600;
-    }
-    
-    .link {
-      color: #888;
-      text-decoration: none;
-      font-size: 0.85rem;
-    }
-    
-    .link:hover { color: #fff; }
-    
-    .workflow-item, .job-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid #1a1a1a;
-    }
-    
-    .workflow-info strong, .job-info strong {
-      display: block;
-      font-size: 0.9rem;
-    }
-    
-    .workflow-info span, .job-info span {
-      color: #666;
-      font-size: 0.8rem;
-    }
-    
-    .workflow-progress {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    
-    .progress-bar {
-      width: 80px;
-      height: 4px;
-      background: #222;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    
-    .progress-fill {
-      height: 100%;
-      background: #fff;
-    }
-    
-    .status {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      background: #222;
-    }
-    
-    .status.active { color: #4ade80; }
-    .status.completed { color: #60a5fa; }
-    .status.failed { color: #f87171; }
-    
-    .empty {
-      color: #666;
-      text-align: center;
-      padding: 2rem;
-    }
-    
-    .empty a { color: #fff; }
   `]
 })
 export class DashboardComponent implements OnInit {
-    authService = inject(AuthService);
-    private workflowService = inject(WorkflowService);
+  authService = inject(AuthService);
+  private workflowService = inject(WorkflowService);
 
-    workflows: Workflow[] = [];
-    jobs: Job[] = [];
+  workflows: Workflow[] = [];
+  jobs: Job[] = [];
+  uploadedFiles = 0;
 
-    ngOnInit(): void {
-        this.loadData();
-    }
+  ngOnInit(): void {
+    this.workflowService.getWorkflows().subscribe(data => this.workflows = data);
+    this.workflowService.getJobs().subscribe(data => this.jobs = data);
+    this.workflowService.listUploadedFiles().subscribe({
+      next: res => this.uploadedFiles = res.files.length,
+      error: () => this.uploadedFiles = 0
+    });
+  }
 
-    loadData(): void {
-        this.workflowService.getWorkflows().subscribe(data => this.workflows = data);
-        this.workflowService.getJobs().subscribe(data => this.jobs = data);
-    }
-
-    getProgress(w: Workflow): number {
-        if (!w.steps?.length) return 0;
-        const completed = w.steps.filter(s => s.status === 'completed').length;
-        return (completed / w.steps.length) * 100;
-    }
-
-    getTotalCandidates(): number {
-        return this.workflows.reduce((sum, w) => sum + (w.stats?.totalCandidates || 0), 0);
-    }
-
-    getTotalOffered(): number {
-        return this.workflows.reduce((sum, w) => sum + (w.stats?.offered || 0), 0);
-    }
+  getActiveWorkflows(): number {
+    return this.workflows.filter(w => w.status === 'active').length;
+  }
 }
+

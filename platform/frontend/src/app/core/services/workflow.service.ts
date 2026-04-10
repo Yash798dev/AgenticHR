@@ -60,6 +60,12 @@ export interface Job {
     createdAt: Date;
 }
 
+export interface UploadedFile {
+    name: string;
+    size: number;
+    modified: string;
+}
+
 @Injectable({
     providedIn: 'root'
 })
@@ -119,7 +125,30 @@ export class WorkflowService {
         return this.http.put<Job>(`${this.API_URL}/jobs/${id}`, job);
     }
 
+    updateJobStatus(id: string, status: Job['status']): Observable<Job> {
+        return this.http.patch<Job>(`${this.API_URL}/jobs/${id}/status`, { status });
+    }
+
     deleteJob(id: string): Observable<void> {
         return this.http.delete<void>(`${this.API_URL}/jobs/${id}`);
+    }
+
+    uploadApplications(file: File, jobId = 'default'): Observable<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('jobId', jobId);
+        return this.http.post(`${this.API_URL}/upload/applications`, formData);
+    }
+
+    listUploadedFiles(): Observable<{ files: UploadedFile[] }> {
+        return this.http.get<{ files: UploadedFile[] }>(`${this.API_URL}/upload/files`);
+    }
+
+    getInterviewAgentStatus(): Observable<any> {
+        return this.http.get(`${this.API_URL}/workflows/interview-agent/status`);
+    }
+
+    getCandidates(workflowId: string): Observable<{ candidates: any[] }> {
+        return this.http.get<{ candidates: any[] }>(`${this.API_URL}/workflows/${workflowId}/candidates`);
     }
 }

@@ -67,7 +67,8 @@ class TranscriptScorerRequest(BaseModel):
 
 
 class OfferLetterRequest(BaseModel):
-    job_id: str
+    action: str  # "accept" or "reject"
+    candidate_email: str
 
 
 class JobStatusResponse(BaseModel):
@@ -239,27 +240,75 @@ async def run_transcript_scorer_task(task_id: str, request: TranscriptScorerRequ
 
 
 async def run_offer_letter_task(task_id: str, request: OfferLetterRequest):
-    """Execute offer letter agent."""
+    """Execute offer letter agent for a specific candidate."""
     try:
         update_task(task_id, "running")
         
         from agents.offer_letter_agent import OfferLetterAgent
         agent = OfferLetterAgent()
-        agent.process_candidates()
         
-        # Read the sent log to return as result
-        import pandas as pd
-        sent_log = os.path.join(ROOT_DIR, "data", "sent_offers.xlsx")
-        result_data = {"message": "Offer letters processed successfully", "offers_sent": 0}
-        
-        if os.path.exists(sent_log):
-            df = pd.read_excel(sent_log)
-            result_data["offers_sent"] = len(df)
-        
-        update_task(task_id, "completed", result=result_data)
-        
+        success = False
+        message = ""
+        if request.action == "accept":
+            success = agent.send_offer_to_candidate(request.candidate_email)
+            message = f"Offer sent to {request.candidate_email}" if success else f"Failed to send offer to {request.candidate_email}"
+        elif request.action == "reject":
+            success = agent.send_rejection_to_candidate(request.candidate_email)
+            message = f"Rejection sent to {request.candidate_email}" if success else f"Failed to send rejection to {request.candidate_email}"
+        else:
+            update_task(task_id, "failed", error="Invalid action")
+            return
+            
+        if success:
+            update_task(task_id, "completed", result={"message": message, "email": request.candidate_email, "action": request.action})
+        else:
+            update_task(task_id, "failed", error=message)
+            
     except Exception as e:
         update_task(task_id, "failed", error=str(e))
+        
+@app.get("/api/agents/offer-letter/candidates")
+async def get_offer_letter_candidates(job_id: Optional[str] = None):
+    """Get list of candidates with their scores and recommendations."""
+    import pandas as pd
+    scores_file = os.path.join(ROOT_DIR, "data", "interview_scores.xlsx")
+    sent_log = os.path.join(ROOT_DIR, "data", "sent_offers.xlsx")
+    
+    if not os.path.exists(scores_file):
+        return {"candidates": []}
+        
+    df_scores = pd.read_excel(scores_file)
+    
+    # Get previously processed candidates
+    processed = {}
+    if os.path.exists(sent_log):
+        df_sent = pd.read_excel(sent_log)
+        for _, row in df_sent.iterrows():
+            email = row.get('Email')
+            if pd.notna(email):
+                processed[email] = row.get('Status', 'Sent')
+                
+    candidates = []
+    # Only show candidates who were recommended or considered
+    eligible = df_scores[df_scores['Recommendation'].isin(['Consider', 'Recommend', 'Strongly Recommend'])]
+    
+    for _, row in eligible.iterrows():
+        email = row.get('Email', '')
+        if not pd.notna(email) or email == 'Not provided':
+            continue
+            
+        status = processed.get(email, 'Pending')
+        
+        candidates.append({
+            "name": row.get('Candidate Name', 'Unknown'),
+            "email": email,
+            "role": row.get('Role', 'Position'),
+            "score": row.get('Total Score', 0),
+            "recommendation": row.get('Recommendation', ''),
+            "status": status
+        })
+        
+    return {"candidates": candidates}
 
 
 

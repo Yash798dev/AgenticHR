@@ -36,6 +36,11 @@ export const routes: Routes = [
         canActivate: [authGuard]
     },
     {
+        path: 'files',
+        loadComponent: () => import('./features/files/files.component').then(m => m.FilesComponent),
+        canActivate: [authGuard]
+    },
+    {
         path: '**',
         redirectTo: 'dashboard'
     }

@@ -371,15 +371,62 @@ class OfferLetterAgent:
         except Exception as e:
             print(f"[ERROR] Failed to send email: {e}")
             return False
+            
+    def send_rejection_email(self, candidate):
+        """Send a polite rejection email."""
+        name = candidate.get('Candidate Name', 'Candidate')
+        email = candidate.get('Email', '')
+        role = candidate.get('Role', 'Position')
+        
+        if not email or email == 'Not provided':
+            print(f"[SKIP] No email for {name}")
+            return False
+            
+        if not self.sender_email or not self.sender_password:
+            print("[ERROR] Email credentials not configured in .env")
+            return False
+            
+        msg = MIMEMultipart()
+        msg['From'] = self.sender_email
+        msg['To'] = email
+        msg['Subject'] = f"Update on your application for {role} at {self.company_name}"
+        
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <p>Dear <strong>{name}</strong>,</p>
+                <p>Thank you for taking the time to interview with <strong>{self.company_name}</strong> for the <strong>{role}</strong> position.</p>
+                <p>We appreciate your interest in joining our team and enjoyed learning about your background and experience. We had a large number of strong applicants, and while your qualifications are impressive, we have decided to move forward with another candidate for this particular role.</p>
+                <p>We wish you the very best of luck in your job search and future professional endeavors. We will keep your resume on file and may reach out if a suitable opening becomes available in the future.</p>
+                <p>Warm regards,<br/><strong>HR Team</strong><br/><strong>{self.company_name}</strong></p>
+            </div>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Send email
+        try:
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+            server.starttls()
+            server.login(self.sender_email, self.sender_password)
+            server.send_message(msg)
+            server.quit()
+            print(f"[EMAIL] Rejection sent to {email}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to send rejection email: {e}")
+            return False
     
-    def log_sent_offer(self, candidate):
+    def log_sent_offer(self, candidate, status='Sent'):
         """Log sent offer to avoid duplicates."""
         new_entry = {
             'Candidate Name': candidate.get('Candidate Name'),
             'Email': candidate.get('Email'),
             'Role': candidate.get('Role'),
             'Sent Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'Status': 'Sent'
+            'Status': status
         }
         
         if os.path.exists(self.sent_log):
@@ -390,8 +437,38 @@ class OfferLetterAgent:
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.to_excel(self.sent_log, index=False)
     
+    def send_offer_to_candidate(self, email):
+        """Find candidate by email, generate PDF, send offer, and log."""
+        candidates = self.get_eligible_candidates()
+        for candidate in candidates:
+            if candidate.get('Email') == email:
+                print(f"[STEP 1] Generating PDF offer letter for {email}...")
+                pdf_path = self.generate_pdf(candidate)
+                print("[STEP 2] Sending email...")
+                if self.send_email(candidate, pdf_path):
+                    self.log_sent_offer(candidate, status='Sent')
+                    print(f"[COMPLETE] Offer sent to {email}")
+                    return True
+                return False
+        print(f"[ERROR] Candidate {email} not found or not eligible.")
+        return False
+        
+    def send_rejection_to_candidate(self, email):
+        """Find candidate by email, send rejection email, and log."""
+        candidates = self.get_eligible_candidates()
+        for candidate in candidates:
+            if candidate.get('Email') == email:
+                print(f"[STEP 1] Sending rejection email to {email}...")
+                if self.send_rejection_email(candidate):
+                    self.log_sent_offer(candidate, status='Rejected')
+                    print(f"[COMPLETE] Rejection sent to {email}")
+                    return True
+                return False
+        print(f"[ERROR] Candidate {email} not found or not eligible.")
+        return False
+        
     def process_candidates(self):
-        """Process all eligible candidates."""
+        """Legacy method to process all eligible candidates."""
         candidates = self.get_eligible_candidates()
         
         if not candidates:
@@ -411,19 +488,8 @@ class OfferLetterAgent:
             print(f"[RECOMMENDATION] {recommendation}")
             print('='*50)
             
-            # Generate PDF
-            print("[STEP 1] Generating PDF offer letter...")
-            pdf_path = self.generate_pdf(candidate)
+            self.send_offer_to_candidate(email)
             
-            # Send email
-            print("[STEP 2] Sending email...")
-            if self.send_email(candidate, pdf_path):
-                # Log as sent
-                self.log_sent_offer(candidate)
-                print(f"[COMPLETE] Offer sent to {name}")
-            else:
-                print(f"[FAILED] Could not send offer to {name}")
-    
     def run(self):
         """Main entry point."""
         print("[RUN] Processing candidates...\n")

@@ -34,7 +34,10 @@ import { AuthService } from '../../core/services/auth.service';
           </div>
           
           <button type="submit" [disabled]="form.invalid || loading" class="btn-primary">
-            {{ loading ? 'Signing in...' : 'Sign In' }}
+            <span class="btn-content">
+              <span *ngIf="loading" class="btn-spinner"></span>
+              {{ loading ? 'Signing in...' : 'Sign In' }}
+            </span>
           </button>
           
           <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
@@ -63,6 +66,13 @@ import { AuthService } from '../../core/services/auth.service';
       border: 1px solid #222;
       border-radius: 12px;
       padding: 2.5rem;
+      transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+    }
+
+    .auth-card:hover {
+      transform: translateY(-2px);
+      border-color: #333;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
     }
     
     .auth-header {
@@ -133,7 +143,8 @@ import { AuthService } from '../../core/services/auth.service';
     }
     
     .btn-primary:hover:not(:disabled) {
-      opacity: 0.9;
+      opacity: 0.95;
+      box-shadow: 0 8px 24px rgba(255,255,255,.12);
     }
     
     .btn-primary:disabled {
