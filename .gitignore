@@ -14,3 +14,4 @@ platform/frontend/node_modules
 platform/frontend/.angular
 platform/backend/.env
 platform/backend/.env.example
+platform/frontend/.angular/
